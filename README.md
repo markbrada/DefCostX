@@ -108,6 +108,14 @@ Defender.jpeg              # Brand image / logo
 
 ---
 
+## 3.1.1 – Sleek visual hotfix
+
+- Restored compact density across buttons, inputs, tabs, and catalogue controls while keeping the 3.1 theme.
+- Rebalanced quote table column widths, borders, and alignments for crisp readability in light and dark modes.
+- Repositioned the totals card alongside the basket to match the pre-facelift layout without changing behaviour.
+
+---
+
 ## 3.1.0 – Sleek visual redesign (phase 1)
 
 - Introduced cohesive design tokens and refreshed the entire visual layer for light/dark mode parity.
@@ -128,6 +136,7 @@ Defender.jpeg              # Brand image / logo
 
 ## Versioning
 
+- **3.1.1** – Sleek visual hotfix: restored compact density, realigned totals sidebar, sharpened table borders; visuals only.
 - **3.1.0** – Sleek visual redesign phase 1 with shared design tokens, rebalanced quote layout, and catalogue restyle.
 - **3.0.11** – Technical CSS refactor: moved inline styling to `/css/style.css`, identical UI/behaviour; ensured dark-mode toggle compatibility and table alignment.
 - **3.0.10** – Removed redundant ‘Add note sub-item’ button; streamlined sub-item creation via ‘Capture catalogue adds as sub-item’ and ‘Add custom line’.
