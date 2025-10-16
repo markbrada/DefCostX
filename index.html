@@ -2,9 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>DefCostX – Placeholder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DefCost 4.0.0</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" defer></script>
+  <script src="xlsx.full.min.js" defer></script>
 </head>
 <body>
-  <h1>DefCostX initial setup</h1>
+  <div id="app" class="app-shell" aria-live="polite"></div>
+  <template id="modal-template">
+    <div class="modal-backdrop" role="presentation"></div>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <header class="modal__header">
+        <h2 id="modal-title"></h2>
+        <button class="btn btn-icon" data-action="close-modal" aria-label="Close">&times;</button>
+      </header>
+      <div class="modal__body"></div>
+      <footer class="modal__footer"></footer>
+    </div>
+  </template>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
