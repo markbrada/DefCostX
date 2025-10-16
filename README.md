@@ -108,6 +108,14 @@ Defender.jpeg              # Brand image / logo
 
 ---
 
+## 3.1.2 – Visual refinement
+
+- Fixed totals panel width and alignment beside the quote builder, including the discount input adornment.
+- Restored compact quote table proportions, inputs, and borders for both light and dark themes.
+- Corrected catalogue header controls, colours, and window behaviours while keeping functionality unchanged.
+
+---
+
 ## 3.1.1 – Sleek visual hotfix
 
 - Restored compact density across buttons, inputs, tabs, and catalogue controls while keeping the 3.1 theme.
@@ -136,6 +144,7 @@ Defender.jpeg              # Brand image / logo
 
 ## Versioning
 
+- **3.1.2** – Visual refinement: fixed totals panel width, restored table proportions and borders, corrected catalogue header and colours, re-enabled catalogue resizing. No functional changes.
 - **3.1.1** – Sleek visual hotfix: restored compact density, realigned totals sidebar, sharpened table borders; visuals only.
 - **3.1.0** – Sleek visual redesign phase 1 with shared design tokens, rebalanced quote layout, and catalogue restyle.
 - **3.0.11** – Technical CSS refactor: moved inline styling to `/css/style.css`, identical UI/behaviour; ensured dark-mode toggle compatibility and table alignment.
