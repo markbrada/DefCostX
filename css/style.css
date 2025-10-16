@@ -24,6 +24,10 @@
   --color-overlay: rgba(8, 12, 24, 0.6);
   --color-row-hover: rgba(91, 109, 255, 0.12);
   --color-subrow-bg: rgba(38, 45, 64, 0.85);
+  --catalog-summary-bg: rgba(255, 255, 255, 0.24);
+  --catalog-summary-border: rgba(255, 255, 255, 0.28);
+  --catalog-summary-hover-bg: rgba(255, 255, 255, 0.32);
+  --catalog-row-alt: rgba(255, 255, 255, 0.06);
   --transition-base: 160ms ease;
   --font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
@@ -51,6 +55,10 @@
   --color-overlay: rgba(15, 23, 42, 0.5);
   --color-row-hover: rgba(63, 89, 255, 0.16);
   --color-subrow-bg: rgba(235, 240, 255, 0.95);
+  --catalog-summary-bg: rgba(15, 23, 42, 0.08);
+  --catalog-summary-border: rgba(15, 23, 42, 0.12);
+  --catalog-summary-hover-bg: rgba(15, 23, 42, 0.14);
+  --catalog-row-alt: rgba(15, 23, 42, 0.05);
 }
 
 * {
@@ -183,9 +191,9 @@ select {
   border: 1px solid var(--color-border);
   border-radius: calc(var(--radius-base) - 8px);
   color: var(--color-text);
-  padding: calc(var(--spacing-unit) * 0.68) calc(var(--spacing-unit) * 1.1);
-  line-height: 1.32;
-  min-height: 32px;
+  padding: calc(var(--spacing-unit) * 0.48) calc(var(--spacing-unit) * 0.95);
+  line-height: 1.26;
+  min-height: 30px;
   transition: border-color var(--transition-base), box-shadow var(--transition-base), background-color var(--transition-base);
 }
 
@@ -289,11 +297,18 @@ textarea {
   flex-direction: column;
   gap: calc(var(--spacing-unit) * 0.9);
   min-width: 0;
+  align-items: flex-end;
+}
+
+@media (max-width: 1099px) {
+  .quote-shell__summary {
+    align-items: stretch;
+  }
 }
 
 @media (min-width: 1100px) {
   .quote-shell__body {
-    grid-template-columns: minmax(0, 1fr) clamp(300px, 30vw, 336px);
+    grid-template-columns: minmax(0, 1fr) clamp(260px, 26vw, 280px);
   }
 }
 
@@ -407,6 +422,19 @@ table {
   font-size: 0.82rem;
 }
 
+#basketHead,
+#basketTable {
+  border: 1px solid var(--color-gridline);
+}
+
+#basketHead {
+  border-bottom: none;
+}
+
+#basketTable {
+  border-top: none;
+}
+
 thead th {
   position: sticky;
   top: 0;
@@ -426,8 +454,8 @@ thead th {
   letter-spacing: 0.03em;
   text-transform: uppercase;
   font-weight: 600;
-  border-bottom: 1px solid var(--color-gridline);
-  padding: 0.58rem 0.65rem;
+  border: 1px solid var(--color-gridline);
+  padding: 0.45rem 0.5rem;
 }
 
 #basketTable thead {
@@ -447,15 +475,19 @@ thead th {
 #basketTable td,
 #basketHead th,
 #basketHead td {
-  border-bottom: 1px solid var(--color-gridline);
-  padding: 0.58rem 0.65rem;
+  border: 1px solid var(--color-gridline);
+  padding: 0.45rem 0.5rem;
   vertical-align: middle;
   color: var(--color-text);
 }
 
+#basketTable tbody tr:first-child td {
+  border-top: none;
+}
+
 #basketTable tbody td {
   font-weight: 500;
-  line-height: 1.3;
+  line-height: 1.24;
 }
 
 #basketTable tbody td:nth-child(4),
@@ -496,7 +528,7 @@ thead th {
 }
 
 .qty-input {
-  width: 72px;
+  width: 84px;
   text-align: right;
 }
 
@@ -672,8 +704,9 @@ thead th {
   border: 1px solid var(--color-border);
   border-radius: calc(var(--radius-base) - 4px);
   box-shadow: 0 16px 34px rgba(9, 14, 32, 0.32);
-  padding: calc(var(--spacing-unit) * 1.05);
+  padding: calc(var(--spacing-unit) * 0.85);
   width: 100%;
+  max-width: 100%;
 }
 
 #grandTotals {
@@ -689,7 +722,7 @@ thead th {
 
 .grand-totals-table th,
 .grand-totals-table td {
-  padding: 0.5rem 0.35rem;
+  padding: 0.45rem 0.35rem;
   border-bottom: 1px solid var(--color-gridline);
   text-align: left;
   font-weight: 600;
@@ -708,16 +741,20 @@ thead th {
 .grand-totals-table .grand-totals-input {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  width: 100%;
 }
 
 .grand-totals-table .grand-totals-input input {
-  flex: 1;
+  flex: 0 1 160px;
+  width: 100%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .grand-totals-table .grand-totals-input span {
-  color: var(--color-muted);
-  font-weight: 500;
+  display: none;
 }
 
 .section-notes-cell {
@@ -884,13 +921,12 @@ thead th {
 #catalogTitlebar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: calc(var(--spacing-unit) * 0.8) calc(var(--spacing-unit) * 1.05);
+  justify-content: flex-start;
+  gap: 0.75rem;
+  padding: calc(var(--spacing-unit) * 0.72) calc(var(--spacing-unit) * 1.05);
   background: var(--color-surface-raised);
   border-bottom: 1px solid var(--color-border);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  user-select: none;
 }
 
 #catalogDots {
@@ -903,15 +939,31 @@ thead th {
   height: 14px;
   border-radius: 999px;
   border: none;
-  background: var(--color-primary-soft);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
   cursor: pointer;
   transition: transform var(--transition-base), box-shadow var(--transition-base);
 }
 
+#catalogClose {
+  background: #ff5f57;
+}
+
+#catalogMin {
+  background: #fdbc2e;
+}
+
+#catalogZoom {
+  background: #28c840;
+}
+
 #catalogDots button:hover {
   transform: scale(1.1);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+#catalogTitle {
+  flex: 1;
+  min-height: 12px;
 }
 
 #catalogBody {
@@ -968,6 +1020,25 @@ thead th {
   background: var(--color-surface-subtle);
   border-radius: calc(var(--radius-base) - 6px);
   overflow: hidden;
+  border: 1px solid var(--color-gridline);
+  border-collapse: collapse;
+  width: 100%;
+}
+
+#sheetContainer table th,
+#sheetContainer table td {
+  border: 1px solid var(--color-gridline);
+  padding: 0.42rem 0.55rem;
+  color: var(--color-text);
+}
+
+#sheetContainer table th {
+  background: var(--color-surface-raised);
+  font-weight: 600;
+}
+
+#sheetContainer table tbody tr:nth-child(even) {
+  background: var(--catalog-row-alt);
 }
 
 #catalogResizeHandle {
@@ -980,12 +1051,24 @@ thead th {
   display: none;
 }
 
+#catalogWindow:not(.qb-full):not(.qb-docked) #catalogResizeHandle {
+  display: block;
+}
+
+#catalogWindow.qb-floating #catalogTitlebar {
+  cursor: grab;
+}
+
+#catalogWindow.qb-floating #catalogTitlebar:active {
+  cursor: grabbing;
+}
+
 #catalogResizeHandle::after {
   content: "";
   position: absolute;
   inset: 4px;
-  border-right: 2px solid rgba(0, 0, 0, 0.2);
-  border-bottom: 2px solid rgba(0, 0, 0, 0.2);
+  border-right: 2px solid var(--color-border-strong);
+  border-bottom: 2px solid var(--color-border-strong);
   border-radius: 2px;
 }
 
@@ -1013,10 +1096,15 @@ summary {
   gap: 0.65rem;
   padding: 0.6rem 0.9rem;
   border-radius: calc(var(--radius-base) - 8px);
-  background: var(--color-surface-raised);
+  background: var(--catalog-summary-bg);
+  border: 1px solid var(--catalog-summary-border);
   font-weight: 600;
-  color: var(--color-text);
-  transition: background-color var(--transition-base), color var(--transition-base);
+  color: #0b0f1c;
+  transition: background-color var(--transition-base), border-color var(--transition-base), color var(--transition-base), box-shadow var(--transition-base);
+}
+
+summary * {
+  color: inherit;
 }
 
 summary::-webkit-details-marker {
@@ -1024,27 +1112,28 @@ summary::-webkit-details-marker {
 }
 
 summary:hover {
-  background: var(--color-primary-soft);
+  background: var(--catalog-summary-hover-bg);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
 }
 
 .cat-orange summary {
-  color: #f28b50;
+  border-color: rgba(242, 139, 80, 0.45);
 }
 
 .cat-blue summary {
-  color: #7fb4ff;
+  border-color: rgba(127, 180, 255, 0.45);
 }
 
 .cat-brown summary {
-  color: #ddb89b;
+  border-color: rgba(221, 184, 155, 0.45);
 }
 
 .cat-red summary {
-  color: #ff8ca0;
+  border-color: rgba(255, 140, 160, 0.5);
 }
 
 .cat-yellow summary {
-  color: #ffd970;
+  border-color: rgba(255, 217, 112, 0.5);
 }
 
 /* Import summary */
@@ -1162,24 +1251,24 @@ summary:hover {
 }
 
 .col-section {
-  width: 136px;
-  min-width: 128px;
+  width: 132px;
+  min-width: 120px;
 }
 
 .col-quantity {
-  width: 124px;
+  width: 104px;
 }
 
 .col-price {
-  width: 148px;
+  width: 140px;
 }
 
 .col-total {
-  width: 160px;
+  width: 150px;
 }
 
 .col-actions {
-  width: 52px;
+  width: 48px;
 }
 
 #basketTable col#col-item,
@@ -1194,27 +1283,27 @@ summary:hover {
 
 #basketHead col.col-section,
 #basketTable col.col-section {
-  width: 136px;
+  width: 132px;
 }
 
 #basketHead col.col-quantity,
 #basketTable col.col-quantity {
-  width: 124px;
+  width: 104px;
 }
 
 #basketHead col.col-price,
 #basketTable col.col-price {
-  width: 148px;
+  width: 140px;
 }
 
 #basketHead col.col-total,
 #basketTable col.col-total {
-  width: 160px;
+  width: 150px;
 }
 
 #basketHead col.col-actions,
 #basketTable col.col-actions {
-  width: 52px;
+  width: 48px;
 }
 
 .subbtn {
