@@ -1,405 +1,164 @@
-import { bus, debounce, formatCurrency, qs, safeFocus } from './utils.js';
+(function(){
+  window.DefCost = window.DefCost || {};
+  window.DefCost.state = window.DefCost.state || {};
+  var state = window.DefCost.state.catalogue = window.DefCost.state.catalogue || {};
+  var api = window.DefCost.catalogue = window.DefCost.catalogue || {};
+  var STORAGE_KEY = 'defcost_catalogue_state';
 
-const CATALOGUE_DATA = [
-  {
-    name: 'Site Items',
-    groups: [
-      {
-        title: 'General Labour',
-        items: [
-          { code: 'LAB001', description: 'Site Labour Allowance', price: 320, unit: 'ea', minCharge: 320, type: 'Service' },
-          { code: 'LAB002', description: 'Supervisor Allowance', price: 420, unit: 'ea', minCharge: 420, type: 'Service' }
-        ]
-      },
-      {
-        title: 'Equipment',
-        items: [
-          { code: 'EQP101', description: 'Scissor Lift', price: 680, unit: 'week', minCharge: 680, type: 'Item' }
-        ]
-      }
-    ]
-  },
-  {
-    name: 'Ladders + Stairs',
-    groups: [
-      {
-        title: 'Stair Units',
-        items: [
-          { code: 'STA300', description: 'Aluminium Stair Unit', price: 1350, unit: 'ea', minCharge: 1350, type: 'Item' }
-        ]
-      }
-    ]
-  },
-  {
-    name: 'Walkway + Platforms',
-    groups: [
-      {
-        title: 'Platform Systems',
-        items: [
-          { code: 'PLT100', description: 'Fixed Walkway Platform', price: 1880, unit: 'ea', minCharge: 1880, type: 'Item' }
-        ]
-      }
-    ]
-  },
-  {
-    name: 'Height Safety',
-    groups: [
-      {
-        title: 'Static Line',
-        items: [
-          { code: 'HSS400', description: 'Static Line + Lifeline Kit', price: 2400, unit: 'kit', minCharge: 2400, type: 'Item' }
-        ]
-      }
-    ]
-  },
-  {
-    name: 'Misc',
-    groups: [
-      {
-        title: 'Consumables',
-        items: [
-          { code: 'MSC120', description: 'Fasteners + Fixings Pack', price: 140, unit: 'pack', minCharge: 140, type: 'Item' }
-        ]
-      }
-    ]
-  },
-  {
-    name: 'Coles',
-    groups: [
-      {
-        title: 'Coles BOH Fencing',
-        items: [
-          { code: 'CLS900', description: 'Back of House Safety Fence', price: 920, unit: 'ea', minCharge: 920, type: 'Item' },
-          { code: 'CLS901', description: 'BOH Gate Assembly', price: 650, unit: 'ea', minCharge: 650, type: 'Item' }
-        ]
-      }
-    ]
-  }
-];
-
-const MAX_RESULTS = 500;
-
-const template = () => `
-  <div class="catalogue-window hidden" role="dialog" aria-label="Catalogue">
-    <div class="catalogue-window__titlebar" data-drag-handle>
-      <span class="catalogue-window__dot red"></span>
-      <span class="catalogue-window__dot yellow"></span>
-      <span class="catalogue-window__dot green"></span>
-      <strong style="margin-left:12px;">Catalogue</strong>
-      <div style="margin-left:auto; display:flex; gap:8px;">
-        <button class="btn btn-ghost" data-action="catalogue-minimise" aria-label="Minimise">–</button>
-        <button class="btn btn-ghost" data-action="catalogue-toggle-size" aria-label="Toggle size">⤢</button>
-        <button class="btn btn-ghost" data-action="catalogue-close" aria-label="Close">×</button>
-      </div>
-    </div>
-    <nav class="catalogue-tabs" role="tablist"></nav>
-    <div class="catalogue-search-row">
-      <input type="search" placeholder="Type to filter…" aria-label="Search catalogue" data-role="search-input" />
-      <label class="catalogue-switch">
-        <span>All Tabs</span>
-        <span class="switch" role="switch" aria-checked="false" tabindex="0" data-role="switch">
-          <span class="switch__thumb"></span>
-        </span>
-      </label>
-      <div class="catalogue-hints">↵ add first • Esc clear/close • ⌘K toggle</div>
-    </div>
-    <div class="catalogue-results" data-role="results"></div>
-  </div>
-`;
-
-export class CatalogueController {
-  constructor(root, initialState) {
-    this.root = root;
-    this.state = {
-      ...initialState,
-      activeTab: initialState.activeTab || CATALOGUE_DATA[0].name,
-      lastQuery: initialState.lastQuery || '',
-      isOpen: Boolean(initialState.isOpen)
+  function getDefaultState(){
+    var winW = window.innerWidth || 1200;
+    var winH = window.innerHeight || 800;
+    var width = Math.min(1100, Math.max(360, Math.round((winW || 0) * 0.9) || 600));
+    if(!isFinite(width) || width <= 0) width = 800;
+    if(width > winW && winW > 0) width = winW;
+    var height = Math.round((winH || 0) * 0.65) || 520;
+    height = Math.min(height, Math.round((winH || 0) * 0.8) || height);
+    if(!isFinite(height) || height <= 0) height = Math.min(winH || 600, 600);
+    if(height > winH && winH > 0) height = winH;
+    var maxX = Math.max(0, (winW || width) - width - 32);
+    var y = Math.min(64, Math.max(0, (winH || height) - height));
+    return {
+      isOpen: true,
+      x: maxX,
+      y: y,
+      w: width,
+      h: height,
+      scope: 'current'
     };
-    this.isFullscreen = false;
-    this.dragging = false;
-    this.resizing = false;
-    this.render();
-    this.bindEvents();
-    if (this.state.isOpen) this.open();
   }
 
-  render() {
-    this.root.insertAdjacentHTML('beforeend', template());
-    this.windowEl = qs('.catalogue-window', this.root);
-    this.tabsEl = qs('.catalogue-tabs', this.windowEl);
-    this.searchInput = qs('[data-role="search-input"]', this.windowEl);
-    this.switchEl = qs('[data-role="switch"]', this.windowEl);
-    this.resultsEl = qs('[data-role="results"]', this.windowEl);
-
-    this.populateTabs();
-    this.updateSwitch();
-    this.searchInput.value = this.state.lastQuery;
-    this.renderResults();
-    this.applyWindowPosition();
-  }
-
-  populateTabs() {
-    this.tabsEl.innerHTML = '';
-    CATALOGUE_DATA.forEach((tab) => {
-      const button = document.createElement('button');
-      button.className = `catalogue-tab${tab.name === this.state.activeTab ? ' active' : ''}`;
-      button.type = 'button';
-      button.textContent = tab.name;
-      button.dataset.tab = tab.name;
-      button.setAttribute('role', 'tab');
-      button.setAttribute('aria-selected', tab.name === this.state.activeTab);
-      this.tabsEl.appendChild(button);
-    });
-  }
-
-  bindEvents() {
-    this.tabsEl.addEventListener('click', (event) => {
-      const btn = event.target.closest('.catalogue-tab');
-      if (!btn) return;
-      this.state.activeTab = btn.dataset.tab;
-      this.populateTabs();
-      this.renderResults();
-      this.persistState();
-    });
-
-    const updateQuery = debounce(() => {
-      this.state.lastQuery = this.searchInput.value;
-      this.renderResults();
-      this.persistState();
-    }, 200);
-    this.searchInput.addEventListener('input', updateQuery);
-    this.searchInput.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        const firstButton = qs('.catalogue-item__add', this.resultsEl);
-        if (firstButton) {
-          firstButton.click();
-        }
-      }
-      if (event.key === 'Escape') {
-        if (this.searchInput.value) {
-          this.searchInput.value = '';
-          this.state.lastQuery = '';
-          this.renderResults();
-          this.persistState();
-        } else {
-          this.close();
-          bus.emit('catalogue:visibility', { isOpen: false });
-        }
-      }
-    });
-
-    this.switchEl.addEventListener('click', () => this.toggleAllTabs());
-    this.switchEl.addEventListener('keydown', (event) => {
-      if (event.key === ' ' || event.key === 'Enter') {
-        event.preventDefault();
-        this.toggleAllTabs();
-      }
-    });
-
-    this.windowEl.addEventListener('click', (event) => {
-      const action = event.target.dataset.action;
-      if (!action) return;
-      if (action === 'catalogue-close') {
-        this.close();
-        bus.emit('catalogue:visibility', { isOpen: false });
-      }
-      if (action === 'catalogue-minimise') {
-        this.windowEl.classList.toggle('hidden');
-        this.state.isOpen = !this.windowEl.classList.contains('hidden');
-        bus.emit('catalogue:visibility', { isOpen: this.state.isOpen });
-        this.persistState();
-      }
-      if (action === 'catalogue-toggle-size') {
-        this.isFullscreen = !this.isFullscreen;
-        if (this.isFullscreen) {
-          this.windowEl.style.left = '50%';
-          this.windowEl.style.top = '12%';
-          this.windowEl.style.width = 'min(1100px, calc(100vw - 48px))';
-          this.windowEl.style.height = 'min(80vh, 680px)';
-          this.windowEl.style.transform = 'translateX(-50%)';
-        } else {
-          this.applyWindowPosition();
-        }
-      }
-    });
-
-    this.resultsEl.addEventListener('click', (event) => {
-      const button = event.target.closest('.catalogue-item__add');
-      if (!button) return;
-      const { tab, group, index } = button.dataset;
-      const record = this.getRecord(tab, group, Number(index));
-      if (!record) return;
-      bus.emit('catalogue:add-item', record);
-    });
-
-    const handle = qs('[data-drag-handle]', this.windowEl);
-    handle.addEventListener('pointerdown', (event) => this.beginDrag(event));
-    document.addEventListener('pointermove', (event) => this.onPointerMove(event));
-    document.addEventListener('pointerup', () => this.endInteractions());
-  }
-
-  renderResults() {
-    const query = (this.state.lastQuery || '').trim().toLowerCase();
-    const results = [];
-    const addItem = (tabName, groupTitle, item) => {
-      results.push({ tabName, groupTitle, item });
+  function normalizeState(raw){
+    var defaults = getDefaultState();
+    raw = raw && typeof raw === 'object' ? raw : {};
+    var winW = window.innerWidth || defaults.w;
+    var winH = window.innerHeight || defaults.h;
+    var next = {
+      isOpen: typeof raw.isOpen === 'boolean' ? raw.isOpen : defaults.isOpen,
+      x: parseFloat(raw.x),
+      y: parseFloat(raw.y),
+      w: parseFloat(raw.w),
+      h: parseFloat(raw.h),
+      scope: raw.scope === 'all' ? 'all' : 'current'
     };
-
-    const activeTabs = this.state.allTabs ? CATALOGUE_DATA : CATALOGUE_DATA.filter((tab) => tab.name === this.state.activeTab);
-
-    activeTabs.forEach((tab) => {
-      tab.groups.forEach((group) => {
-        group.items.forEach((item) => {
-          const haystack = `${item.code} ${item.description}`.toLowerCase();
-          if (!query || haystack.includes(query)) {
-            addItem(tab.name, group.title, item);
-          }
-        });
-      });
-    });
-
-    const limited = results.slice(0, MAX_RESULTS);
-
-    if (limited.length === 0) {
-      this.resultsEl.innerHTML = '<p style="opacity:0.6;">No catalogue results.</p>';
-      return;
-    }
-
-    const groups = new Map();
-    limited.forEach((entry) => {
-      const key = `${entry.tabName}::${entry.groupTitle}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(entry);
-    });
-
-    const frag = document.createDocumentFragment();
-    groups.forEach((entries, key) => {
-      const [, groupTitle] = key.split('::');
-      const wrap = document.createElement('div');
-      wrap.className = 'catalogue-group';
-      const title = document.createElement('div');
-      title.className = 'catalogue-group__title';
-      title.textContent = groupTitle;
-      wrap.appendChild(title);
-      entries.forEach((entry, idx) => {
-        const row = document.createElement('div');
-        row.className = 'catalogue-item';
-        row.innerHTML = `
-          <span>${entry.item.code}</span>
-          <span>${entry.item.description}</span>
-          <span>${entry.item.unit}</span>
-          <span>${formatCurrency(entry.item.price)}</span>
-          <span>${formatCurrency(entry.item.minCharge)}</span>
-          <span>${entry.item.type}</span>
-          <button class="btn catalogue-item__add" data-tab="${entry.tabName}" data-group="${entry.groupTitle}" data-index="${idx}">+ Add</button>
-        `;
-        if (this.state.allTabs) {
-          const badge = document.createElement('span');
-          badge.className = 'badge-tab';
-          badge.textContent = entry.tabName;
-          row.children[1].appendChild(badge);
-        }
-        wrap.appendChild(row);
-      });
-      frag.appendChild(wrap);
-    });
-
-    this.resultsEl.innerHTML = '';
-    this.resultsEl.appendChild(frag);
+    if(!isFinite(next.w) || next.w < 320) next.w = defaults.w;
+    next.w = Math.min(Math.max(320, next.w), winW || next.w);
+    if(!isFinite(next.h) || next.h < 280) next.h = defaults.h;
+    next.h = Math.min(Math.max(280, next.h), winH || next.h);
+    if(!isFinite(next.x)) next.x = Math.max(0, (winW || next.w) - next.w - 32);
+    if(!isFinite(next.y)) next.y = defaults.y;
+    var maxX = Math.max(0, (winW || next.w) - next.w);
+    var maxY = Math.max(0, (winH || next.h) - next.h);
+    next.x = Math.min(Math.max(0, next.x), maxX);
+    next.y = Math.min(Math.max(0, next.y), maxY);
+    return next;
   }
 
-  toggleAllTabs() {
-    this.state.allTabs = !this.state.allTabs;
-    this.updateSwitch();
-    this.renderResults();
-    this.persistState();
+  function syncState(raw){
+    var normalized = normalizeState(raw || state);
+    state.isOpen = normalized.isOpen;
+    state.x = normalized.x;
+    state.y = normalized.y;
+    state.w = normalized.w;
+    state.h = normalized.h;
+    state.scope = normalized.scope;
+    return normalized;
   }
 
-  updateSwitch() {
-    const on = Boolean(this.state.allTabs);
-    this.switchEl.dataset.state = on ? 'on' : 'off';
-    this.switchEl.setAttribute('aria-checked', on);
+  function getElements(opts){
+    opts = opts || {};
+    var el = opts.element || document.getElementById('catalogWindow');
+    var dock = opts.dockIcon || document.getElementById('catalogDockIcon');
+    return { windowEl: el, dockIcon: dock };
   }
 
-  getRecord(tabName, groupTitle, index) {
-    const tab = CATALOGUE_DATA.find((tab) => tab.name === tabName);
-    if (!tab) return null;
-    const group = tab.groups.find((group) => group.title === groupTitle);
-    if (!group) return null;
-    const item = group.items[index];
-    if (!item) return null;
-    return { ...item, sourceTab: tabName, groupTitle };
-  }
-
-  open() {
-    this.state.isOpen = true;
-    this.windowEl.classList.remove('hidden');
-    safeFocus(this.searchInput);
-    this.persistState();
-  }
-
-  close() {
-    this.state.isOpen = false;
-    this.windowEl.classList.add('hidden');
-    this.persistState();
-  }
-
-  applyWindowPosition() {
-    const { x, y, w, h } = this.state;
-    if (typeof x === 'number') this.windowEl.style.left = `${x}px`;
-    if (typeof y === 'number') this.windowEl.style.top = `${y}px`;
-    if (typeof w === 'number') this.windowEl.style.width = `${w}px`;
-    if (typeof h === 'number') this.windowEl.style.height = `${h}px`;
-    this.windowEl.style.transform = 'translateX(-50%)';
-  }
-
-  persistState() {
-    bus.emit('catalogue:state-change', { ...this.state });
-  }
-
-  beginDrag(event) {
-    this.dragging = true;
-    this.dragOffset = {
-      x: event.clientX - this.windowEl.getBoundingClientRect().left,
-      y: event.clientY - this.windowEl.getBoundingClientRect().top
-    };
-    this.windowEl.setPointerCapture(event.pointerId);
-  }
-
-  onPointerMove(event) {
-    if (this.dragging) {
-      const left = event.clientX - this.dragOffset.x;
-      const top = event.clientY - this.dragOffset.y;
-      this.windowEl.style.left = `${left}px`;
-      this.windowEl.style.top = `${top}px`;
-      this.windowEl.style.transform = 'translateX(0)';
-      Object.assign(this.state, { x: left, y: top });
-      this.persistState();
+  function applyDisplay(current, opts){
+    var elements = getElements(opts);
+    var qbWindow = elements.windowEl;
+    var qbDockIcon = elements.dockIcon;
+    if(!qbWindow) return;
+    if(current.isOpen){
+      qbWindow.style.display = 'flex';
+      qbWindow.setAttribute('aria-hidden', 'false');
+      if(qbDockIcon){
+        qbDockIcon.style.display = 'none';
+      }
+    }else{
+      qbWindow.style.display = 'none';
+      qbWindow.setAttribute('aria-hidden', 'true');
+      if(qbDockIcon){
+        qbDockIcon.style.display = 'inline-flex';
+      }
     }
   }
 
-  endInteractions() {
-    if (this.dragging) {
-      this.dragging = false;
-    }
-    if (this.resizing) {
-      this.resizing = false;
-    }
+  function applyPosition(current, opts){
+    opts = opts || {};
+    if(opts.skipPosition) return;
+    var qbWindow = getElements(opts).windowEl;
+    if(!qbWindow) return;
+    qbWindow.style.top = (isFinite(current.y) ? current.y : 0) + 'px';
+    qbWindow.style.left = (isFinite(current.x) ? current.x : 0) + 'px';
+    qbWindow.style.right = 'auto';
+    qbWindow.style.bottom = 'auto';
+    qbWindow.style.width = current.w ? current.w + 'px' : '';
+    qbWindow.style.height = current.h ? current.h + 'px' : '';
   }
-}
 
-export const initCatalogue = (root, state) => {
-  const controller = new CatalogueController(root, state);
-  bus.on('catalogue:toggle', () => {
-    if (controller.state.isOpen) {
-      controller.close();
-    } else {
-      controller.open();
+  api.persistState = function(opts){
+    var normalized = syncState(state);
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        isOpen: normalized.isOpen,
+        x: Math.round(isFinite(normalized.x) ? normalized.x : 0),
+        y: Math.round(isFinite(normalized.y) ? normalized.y : 0),
+        w: Math.round(isFinite(normalized.w) ? normalized.w : 0),
+        h: Math.round(isFinite(normalized.h) ? normalized.h : 0),
+        scope: normalized.scope === 'all' ? 'all' : 'current'
+      }));
+    }catch(e){}
+    return normalized;
+  };
+
+  api.restoreState = function(opts){
+    var stored = null;
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        stored = JSON.parse(raw);
+      }
+    }catch(e){}
+    var normalized = syncState(stored);
+    applyDisplay(normalized, Object.assign({}, opts, { skipPosition: true }));
+    applyPosition(normalized, opts);
+    return state;
+  };
+
+  api.open = function(opts){
+    opts = opts || {};
+    var normalized = syncState(state);
+    if(!normalized.isOpen){
+      normalized.isOpen = true;
+      normalized = syncState(normalized);
     }
-  });
-  bus.on('catalogue:open', () => controller.open());
-  bus.on('catalogue:close', () => controller.close());
-  return controller;
-};
+    applyDisplay(normalized, opts);
+    applyPosition(normalized, opts);
+    if(!opts.skipSave){
+      api.persistState(opts);
+    }
+    return state;
+  };
+
+  api.close = function(opts){
+    opts = opts || {};
+    var normalized = syncState(state);
+    if(normalized.isOpen){
+      normalized.isOpen = false;
+      normalized = syncState(normalized);
+    }
+    applyDisplay(normalized, Object.assign({}, opts, { skipPosition: true }));
+    if(!opts.skipSave){
+      api.persistState(opts);
+    }
+    return state;
+  };
+})();

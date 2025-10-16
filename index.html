@@ -1,26 +1,126 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DefCost 4.0.0</title>
-  <link rel="stylesheet" href="css/style.css">
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" defer></script>
-  <script src="xlsx.full.min.js" defer></script>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<meta charset="UTF-8">
+  <title>DefCost 3.1.0</title>
+<link rel="stylesheet" href="./css/style.css">
 </head>
-<body>
-  <div id="app" class="app-shell" aria-live="polite"></div>
-  <template id="modal-template">
-    <div class="modal-backdrop" role="presentation"></div>
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <header class="modal__header">
-        <h2 id="modal-title"></h2>
-        <button class="btn btn-icon" data-action="close-modal" aria-label="Close">&times;</button>
-      </header>
-      <div class="modal__body"></div>
-      <footer class="modal__footer"></footer>
+<body class="light">
+<header class="page-heading" role="banner">
+  <h1 class="page-title">DefCost 3.1.0</h1>
+  <button id="darkModeToggle" class="btn btn-ghost" type="button">Toggle dark mode</button>
+</header>
+<div id="quoteBuilderMain" class="quote-shell" aria-label="Quote Builder" role="region">
+  <header id="quoteHeader" class="quote-shell__header">
+    <div class="quote-header-left">
+      <h2 id="qbTitle">Quote Builder</h2>
+      <span id="toast"></span>
     </div>
-  </template>
-  <script type="module" src="js/main.js"></script>
+    <div id="quoteActions" class="quote-actions">
+      <button id="clearQuoteBtn" class="btn btn-danger" type="button" aria-label="Delete quote">Delete quote</button>
+      <button id="addCustomBtn" class="btn btn-primary" type="button">Add custom line</button>
+      <button id="addSectionBtn" class="btn btn-primary" type="button">+ Section</button>
+      <button id="importCsvBtn" class="btn btn-tonal" type="button">Import CSV</button>
+      <button id="exportCsvBtn" class="btn btn-outline" type="button">Export quote CSV</button>
+      <input id="importCsvInput" class="hidden-input" type="file" accept=".csv">
+    </div>
+  </header>
+  <div class="quote-shell__body">
+    <section class="quote-shell__table">
+      <div id="sectionTabsBar" class="section-tabs-bar">
+        <div id="sectionTabs"></div>
+      </div>
+      <div id="basketContainer" class="basket-shell">
+        <div id="basketSticky" class="basket-shell__sticky">
+          <div id="basketStickyHead" class="basket-shell__head">
+            <table id="basketHead">
+              <colgroup>
+                <col class="col-handle">
+                <col class="col-section">
+                <col id="col-item">
+                <col class="col-quantity">
+                <col class="col-price">
+                <col class="col-total">
+                <col class="col-actions">
+              </colgroup>
+              <thead><tr>
+                <th class="sort-handle">≡</th><th>Section</th><th>Item</th><th>Quantity</th>
+                <th>Price</th>
+                <th>Line Total</th><th></th>
+              </tr></thead>
+            </table>
+          </div>
+        </div>
+        <div id="basketContent" class="basket-shell__content">
+          <div class="basket-table-area">
+          <table id="basketTable">
+            <colgroup>
+              <col class="col-handle">
+              <col class="col-section">
+              <col id="col-item">
+              <col class="col-quantity">
+              <col class="col-price">
+              <col class="col-total">
+              <col class="col-actions">
+            </colgroup>
+              <thead><tr>
+                <th class="sort-handle">≡</th><th>Section</th><th>Item</th><th>Quantity</th>
+                <th>Price</th>
+                <th>Line Total</th><th></th>
+              </tr></thead>
+            <tbody></tbody><tfoot></tfoot>
+          </table>
+          </div>
+        </div>
+      </div>
+    </section>
+    <aside class="quote-shell__summary" aria-label="Quote totals panel">
+      <div class="grand-totals-wrapper quote-summary-card">
+        <aside id="grandTotals" aria-live="polite"></aside>
+      </div>
+    </aside>
+  </div>
+</div>
+<div id="catalogWindow" aria-label="Catalogue window" role="dialog" aria-modal="false">
+  <div id="catalogTitlebar">
+    <div id="catalogDots">
+      <button id="catalogClose" aria-label="Hide catalogue" title="Hide catalogue"></button>
+      <button id="catalogMin" aria-label="Dock window" title="Dock window"></button>
+      <button id="catalogZoom" aria-label="Full screen" title="Full screen"></button>
+    </div>
+    <div id="catalogTitle">Catalogue</div>
+  </div>
+  <div id="catalogBody">
+    <div id="sheetTabs"></div>
+    <div id="status" class="status-text"></div>
+    <div id="manualLoad" class="manual-load"><label class="search-label">Load workbook:</label><input type="file" id="xlsxPicker" accept=".xlsx"></div>
+    <div id="sheetContainer"></div>
+  </div>
+  <div id="catalogResizeHandle" aria-hidden="true"></div>
+</div>
+<button id="catalogDockIcon" class="btn btn-tonal" title="Open catalogue" aria-label="Open catalogue">Catalogue</button>
+<script src="xlsx.full.min.js"></script>
+<script>if(!window.XLSX){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.20.3/dist/xlsx.full.min.js';s.setAttribute('data-sheetjs','1');document.head.appendChild(s);}</script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script type="module" src="./js/main.js"></script>
+<script>
+(function(){try{
+  if(!window.__wd_main_ok__){
+    var status=document.getElementById('status');
+    if(status){status.innerHTML='<span style="color:#b00">Main script did not finish loading. Check Console for the first error above.</span>';}
+    if(window.XLSX){
+      fetch('./Defender%20Price%20List.xlsx',{cache:'no-store'}).then(function(r){return r.arrayBuffer();}).then(function(buf){
+        var wb=XLSX.read(buf,{type:'array'});var names=Object.keys(wb.Sheets||{});if(!names.length)return;
+        var html=XLSX.utils.sheet_to_html(wb.Sheets[names[0]]);
+        document.getElementById('sheetContainer').innerHTML=html;
+      }).catch(function(){});
+    }
+  }
+}catch(e){} })();
+</script>
 </body>
 </html>

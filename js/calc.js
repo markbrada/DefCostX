@@ -1,85 +1,221 @@
-import { roundCurrency } from './utils.js';
+const GST_RATE = 0.10;
 
-export const lineTotal = (qty, price) => {
-  const safeQty = Number.isFinite(qty) && qty > 0 ? qty : 0;
-  const safePrice = Number.isFinite(price) && price > 0 ? price : 0;
-  return roundCurrency(safeQty * safePrice, 2);
-};
+const currencyFormatter = (() => {
+  try {
+    return new Intl.NumberFormat('en-AU', {
+      style: 'currency',
+      currency: 'AUD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  } catch (err) {
+    return null;
+  }
+})();
 
-export const computeSectionTotals = (sections) => {
-  const totals = new Map();
-  sections.forEach((section) => {
-    const subtotal = section.items.reduce((acc, item) => {
-      const qty = Number.isFinite(item.qty) ? item.qty : 0;
-      const price = Number.isFinite(item.price) ? item.price : 0;
-      return acc + lineTotal(qty, price);
-    }, 0);
-    totals.set(section.id, roundCurrency(subtotal, 2));
-  });
-  return totals;
-};
+export function lineTotal(qty, price) {
+  let q = Number.isFinite(qty) ? qty : 0;
+  if (q < 0) {
+    q = 0;
+  }
+  const p = Number.isFinite(price) ? price : 0;
+  return q * p;
+}
 
-export const computeQuoteTotals = (basket) => {
-  const sectionsTotal = basket.sections.reduce((acc, section) => acc + section.items.reduce((sum, item) => {
-    return sum + lineTotal(item.qty, item.price);
-  }, 0), 0);
+export function roundCurrency(val) {
+  if (!isFinite(val)) {
+    return 0;
+  }
+  return Math.round(val * 100) / 100;
+}
 
-  const totalEx = roundCurrency(sectionsTotal, 2);
-  const discountPct = Number.isFinite(basket.discountPct) ? basket.discountPct : 0;
-  const discountedEx = applyDiscountPct(totalEx, discountPct);
-  const gst = roundCurrency(discountedEx * 0.1, 2);
-  const grandIncl = roundCurrency(discountedEx + gst, 2);
+export function formatCurrency(val) {
+  return roundCurrency(isFinite(val) ? val : 0).toFixed(2);
+}
+
+export function formatCurrencyWithSymbol(val) {
+  const safe = roundCurrency(isFinite(val) ? val : 0);
+  if (currencyFormatter) {
+    try {
+      return currencyFormatter.format(safe);
+    } catch (err) {
+      // fall through
+    }
+  }
+  const parts = safe.toFixed(2).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return '$' + parts.join('.');
+}
+
+export function formatPercent(val) {
+  return roundCurrency(isFinite(val) ? val : 0).toFixed(2);
+}
+
+export function recalcGrandTotal(base, discount) {
+  const b = isFinite(base) ? base : 0;
+  const d = isFinite(discount) ? discount : 0;
+  let computed = b * (1 - d / 100);
+  if (!isFinite(computed)) {
+    computed = 0;
+  }
+  return roundCurrency(computed < 0 ? 0 : computed);
+}
+
+export function calculateGst(amount) {
+  const base = isFinite(amount) ? amount : 0;
+  return roundCurrency(base * GST_RATE);
+}
+
+export function buildReportModel(basket, sections) {
+  const safeSections = Array.isArray(sections) && sections.length
+    ? sections
+    : [{ id: 1, name: 'Section 1', notes: '' }];
+
+  const sectionsById = {};
+  for (let i = 0; i < safeSections.length; i++) {
+    sectionsById[safeSections[i].id] = safeSections[i];
+  }
+
+  const childMap = {};
+  for (let i = 0; i < (basket ? basket.length : 0); i++) {
+    const entry = basket[i];
+    if (entry && entry.pid) {
+      (childMap[entry.pid] || (childMap[entry.pid] = [])).push(entry);
+    }
+  }
+
+  const secMap = {};
+  function ensureSection(id) {
+    const source = sectionsById[id];
+    if (secMap[id]) {
+      secMap[id].notes = source && typeof source.notes === 'string' ? source.notes : '';
+      return secMap[id];
+    }
+    const name = source ? source.name : 'Section ' + id;
+    secMap[id] = {
+      id: id,
+      name: name,
+      items: [],
+      subtotalEx: 0,
+      subtotalGst: 0,
+      subtotalTotal: 0,
+      notes: source && typeof source.notes === 'string' ? source.notes : ''
+    };
+    return secMap[id];
+  }
+
+  function addAmounts(obj, qty, ex) {
+    const lineEx = lineTotal(qty, ex);
+    const gst = lineEx * GST_RATE;
+    obj.subtotalEx += lineEx;
+    obj.subtotalGst += gst;
+    obj.subtotalTotal += lineEx + gst;
+  }
+
+  for (let i = 0; i < (basket ? basket.length : 0); i++) {
+    const item = basket[i];
+    if (!item || item.pid) {
+      continue;
+    }
+    const sectionId = item.sectionId || safeSections[0].id;
+    const section = ensureSection(sectionId);
+    const subs = childMap[item.id] || [];
+    section.items.push({ parent: item, subs: subs });
+    addAmounts(section, item.qty, item.ex);
+    for (let k = 0; k < subs.length; k++) {
+      addAmounts(section, subs[k].qty, subs[k].ex);
+    }
+  }
+
+  const orderedSections = [];
+  const seenSections = {};
+  for (let i = 0; i < safeSections.length; i++) {
+    const entry = ensureSection(safeSections[i].id);
+    orderedSections.push(entry);
+    seenSections[entry.id] = true;
+  }
+
+  for (const id in secMap) {
+    if (Object.prototype.hasOwnProperty.call(secMap, id) && !seenSections[id]) {
+      orderedSections.push(secMap[id]);
+    }
+  }
+
+  if (!orderedSections.length) {
+    const base = safeSections[0];
+    orderedSections.push({
+      id: base.id,
+      name: base.name,
+      items: [],
+      subtotalEx: 0,
+      subtotalGst: 0,
+      subtotalTotal: 0,
+      notes: base && typeof base.notes === 'string' ? base.notes : ''
+    });
+  }
+
+  let grandEx = 0;
+  let grandGst = 0;
+  let grandTotal = 0;
+  for (let s = 0; s < orderedSections.length; s++) {
+    grandEx += orderedSections[s].subtotalEx;
+    grandGst += orderedSections[s].subtotalGst;
+    grandTotal += orderedSections[s].subtotalTotal;
+  }
 
   return {
-    totalEx,
-    discountPct: roundCurrency(discountPct, 4),
-    discountedEx,
-    gst,
-    grandIncl
+    sections: orderedSections,
+    grandEx: grandEx,
+    grandGst: grandGst,
+    grandTotal: grandTotal
   };
-};
+}
 
-export const applyDiscountPct = (totalEx, discountPct) => {
-  const pct = Number.isFinite(discountPct) ? discountPct : 0;
-  const pctClamped = Math.min(Math.max(pct, 0), 100);
-  const discounted = totalEx * (1 - pctClamped / 100);
-  return roundCurrency(discounted, 2);
-};
+export function computeGrandTotalsState({
+  report,
+  basketCount,
+  discountPercent,
+  currentGrandTotal,
+  lastBaseTotal,
+  preserveGrandTotal
+}) {
+  const base = report && isFinite(report.grandEx) ? report.grandEx : 0;
+  const hasItems = basketCount > 0;
+  const discount = isFinite(discountPercent) ? discountPercent : 0;
+  let nextGrandTotal = isFinite(currentGrandTotal) ? roundCurrency(currentGrandTotal) : 0;
+  let nextLastBase = isFinite(lastBaseTotal) ? lastBaseTotal : 0;
+  let gstAmount = 0;
+  let grandIncl = 0;
 
-export const deriveDiscountFromGrandTotal = (totalEx, desiredGrand) => {
-  const safeTotal = Number.isFinite(totalEx) && totalEx > 0 ? totalEx : 0;
-  const safeDesired = Number.isFinite(desiredGrand) ? desiredGrand : 0;
-  if (safeTotal === 0) {
-    return { discountPct: 0, discountedEx: 0 };
+  if (!hasItems) {
+    return {
+      hasItems: false,
+      base: base,
+      discountPercent: discount,
+      currentGrandTotal: 0,
+      lastBaseTotal: 0,
+      gstAmount: 0,
+      grandIncl: 0
+    };
   }
-  const pct = 100 - (safeDesired / safeTotal) * 100;
+
+  if (!preserveGrandTotal && Math.abs(base - nextLastBase) > 0.005) {
+    nextGrandTotal = recalcGrandTotal(base, discount);
+  }
+
+  nextLastBase = base;
+  gstAmount = calculateGst(nextGrandTotal);
+  grandIncl = roundCurrency(nextGrandTotal + gstAmount);
+
   return {
-    discountPct: roundCurrency(Math.min(Math.max(pct, 0), 100), 4),
-    discountedEx: roundCurrency(safeDesired, 2)
+    hasItems: true,
+    base: base,
+    discountPercent: discount,
+    currentGrandTotal: nextGrandTotal,
+    lastBaseTotal: nextLastBase,
+    gstAmount: gstAmount,
+    grandIncl: grandIncl
   };
-};
+}
 
-export const syncGrandTotal = (basket, { discountPct, discountedEx }) => {
-  const totalEx = basket.sections.reduce((acc, section) => acc + section.items.reduce((sum, item) => sum + lineTotal(item.qty, item.price), 0), 0);
-  if (typeof discountPct === 'number') {
-    const nextDiscounted = applyDiscountPct(totalEx, discountPct);
-    const gst = roundCurrency(nextDiscounted * 0.1, 2);
-    return {
-      discountPct: roundCurrency(Math.min(Math.max(discountPct, 0), 100), 4),
-      discountedEx: nextDiscounted,
-      gst,
-      grandIncl: roundCurrency(nextDiscounted + gst, 2)
-    };
-  }
-  if (typeof discountedEx === 'number') {
-    const derived = deriveDiscountFromGrandTotal(totalEx, discountedEx);
-    const gst = roundCurrency(derived.discountedEx * 0.1, 2);
-    return {
-      discountPct: derived.discountPct,
-      discountedEx: derived.discountedEx,
-      gst,
-      grandIncl: roundCurrency(derived.discountedEx + gst, 2)
-    };
-  }
-  return computeQuoteTotals({ ...basket, discountPct: basket.discountPct || 0 });
-};
+export { GST_RATE };
