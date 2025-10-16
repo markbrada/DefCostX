@@ -1,53 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DefCost 4.0.0</title>
-  <link rel="stylesheet" href="css/style.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-  <script defer src="./xlsx.full.min.js"></script>
-  <script type="module" src="js/main.js" defer></script>
+  <meta charset="UTF-8">
+  <title>DefCostX – Placeholder</title>
 </head>
 <body>
-  <div id="app" class="app-shell">
-    <header class="app-header">
-      <div class="branding">
-        <span class="product">DefCost</span>
-        <span class="version">4.0.0</span>
-      </div>
-      <div class="header-actions">
-        <button id="toggle-dark" class="btn btn-secondary" aria-pressed="false">Toggle Dark Mode</button>
-      </div>
-    </header>
-
-    <main class="app-main">
-      <section class="quote-panel">
-        <div class="panel-heading">
-          <div class="title-group">
-            <h1>Quote Builder</h1>
-            <div id="status-line" class="status-line" role="status" aria-live="polite"></div>
-          </div>
-          <div class="toolbar" role="toolbar" aria-label="Quote actions">
-            <button class="btn btn-danger" data-action="delete-quote">Delete Quote</button>
-            <button class="btn" data-action="add-custom-line">Add Custom Line</button>
-            <button class="btn" data-action="add-section">+ Section</button>
-            <button class="btn" data-action="import-csv">Import CSV</button>
-            <button class="btn" data-action="export-csv">Export CSV</button>
-          </div>
-        </div>
-        <nav id="section-tabs" class="section-tabs" role="tablist"></nav>
-        <div id="quote-table-wrapper" class="quote-table-wrapper"></div>
-      </section>
-      <aside id="totals-panel" class="totals-panel" aria-label="Totals summary"></aside>
-    </main>
-  </div>
-
-  <div id="modal-root" class="modal-root" aria-live="assertive"></div>
-  <div id="toast-root" class="toast-root" aria-live="polite"></div>
-  <div id="catalogue-root" class="catalogue-root"></div>
+  <h1>DefCostX initial setup</h1>
 </body>
 </html>
