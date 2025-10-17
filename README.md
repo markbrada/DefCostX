@@ -108,6 +108,12 @@ Defender.jpeg              # Brand image / logo
 
 ---
 
+## 3.1.3 – Quantity column layout
+
+- Widened the quantity column and balanced price/line total widths so the +/- controls sit inline with the input.
+
+---
+
 ## 3.1.2 – Visual refinement
 
 - Fixed totals panel width, restored table proportions and borders, corrected catalogue header and colours, re-enabled catalogue resizing. No functional changes.
@@ -142,6 +148,7 @@ Defender.jpeg              # Brand image / logo
 
 ## Versioning
 
+- **3.1.3** – Quantity column layout: widened the quantity column and rebalanced adjacent totals so stepper controls align inline.
 - **3.1.2** – Visual refinement: fixed totals panel width, restored table proportions and borders, corrected catalogue header and colours, re-enabled catalogue resizing. No functional changes.
 - **3.1.1** – Sleek visual hotfix: restored compact density, realigned totals sidebar, sharpened table borders; visuals only.
 - **3.1.0** – Sleek visual redesign phase 1 with shared design tokens, rebalanced quote layout, and catalogue restyle.
