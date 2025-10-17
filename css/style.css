@@ -527,8 +527,21 @@ thead th {
   font-size: 1rem;
 }
 
+.qty-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: calc(var(--spacing-unit) * 0.35);
+}
+
+.qty-controls button {
+  flex: 0 0 auto;
+}
+
 .qty-input {
   width: 84px;
+  flex: 0 0 84px;
   text-align: right;
 }
 
@@ -1256,15 +1269,15 @@ summary:hover {
 }
 
 .col-quantity {
-  width: 104px;
+  width: 156px;
 }
 
 .col-price {
-  width: 140px;
+  width: 124px;
 }
 
 .col-total {
-  width: 150px;
+  width: 138px;
 }
 
 .col-actions {
@@ -1288,17 +1301,17 @@ summary:hover {
 
 #basketHead col.col-quantity,
 #basketTable col.col-quantity {
-  width: 104px;
+  width: 156px;
 }
 
 #basketHead col.col-price,
 #basketTable col.col-price {
-  width: 140px;
+  width: 124px;
 }
 
 #basketHead col.col-total,
 #basketTable col.col-total {
-  width: 150px;
+  width: 138px;
 }
 
 #basketHead col.col-actions,
