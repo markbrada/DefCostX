@@ -768,26 +768,40 @@ window.DefCost.ui = window.DefCost.ui || {};
         draggable: 'tr.main-row',
         animation: 150,
         onEnd: function () {
+          var currentState = window.DefCost && window.DefCost.state ? window.DefCost.state : {};
+          var currentBasketGetter = typeof currentState.getBasket === 'function' ? currentState.getBasket : basketGetter;
+          var currentSetBasket = typeof currentState.setBasket === 'function' ? currentState.setBasket : setBasket;
+          var currentPersist = typeof currentState.persistBasket === 'function' ? currentState.persistBasket : persistBasket;
+          var currentRender = (window.DefCost && window.DefCost.ui && typeof window.DefCost.ui.renderBasket === 'function')
+            ? window.DefCost.ui.renderBasket
+            : renderBasket;
+          var activeId = typeof currentState.getActiveSectionId === 'function'
+            ? currentState.getActiveSectionId()
+            : activeSectionId;
+          var currentBasket = currentBasketGetter ? currentBasketGetter() : (Array.isArray(currentState.basket) ? currentState.basket : []);
+          if (!Array.isArray(currentBasket) || !currentBasket.length) {
+            return;
+          }
           var rows = bBody.querySelectorAll('tr.main-row');
           var order = [];
           for (var k = 0; k < rows.length; k++) {
             order.push(+rows[k].dataset.id);
           }
           var childMap = {};
-          for (var t = 0; t < basket.length; t++) {
-            var it = basket[t];
+          for (var t = 0; t < currentBasket.length; t++) {
+            var it = currentBasket[t];
             if (it && it.pid) {
               (childMap[it.pid] || (childMap[it.pid] = [])).push(it);
             }
           }
           var parentsById = {};
-          for (var t2 = 0; t2 < basket.length; t2++) {
-            var current = basket[t2];
+          for (var t2 = 0; t2 < currentBasket.length; t2++) {
+            var current = currentBasket[t2];
             if (current && !current.pid) {
               parentsById[current.id] = current;
             }
           }
-          var sectionId = activeSectionId;
+          var sectionId = activeId;
           var orderedParents = [];
           for (var o = 0; o < order.length; o++) {
             var pid = order[o];
@@ -800,8 +814,8 @@ window.DefCost.ui = window.DefCost.ui || {};
           for (var op = 0; op < orderedParents.length; op++) {
             seen[orderedParents[op].id] = true;
           }
-          for (var bp = 0; bp < basket.length; bp++) {
-            var candidate = basket[bp];
+          for (var bp = 0; bp < currentBasket.length; bp++) {
+            var candidate = currentBasket[bp];
             if (candidate && !candidate.pid && candidate.sectionId === sectionId && !seen[candidate.id]) {
               orderedParents.push(candidate);
               seen[candidate.id] = true;
@@ -810,8 +824,8 @@ window.DefCost.ui = window.DefCost.ui || {};
           var rest = [];
           var insertPos = null;
           var skipParents = {};
-          for (var idx = 0; idx < basket.length; idx++) {
-            var item = basket[idx];
+          for (var idx = 0; idx < currentBasket.length; idx++) {
+            var item = currentBasket[idx];
             if (!item) {
               continue;
             }
@@ -843,9 +857,9 @@ window.DefCost.ui = window.DefCost.ui || {};
               sectionBlock.push(kids[kc]);
             }
           }
-          basket = setBasket(rest.slice(0, insertPos).concat(sectionBlock, rest.slice(insertPos)));
-          persistBasket();
-          renderBasket();
+          currentSetBasket(rest.slice(0, insertPos).concat(sectionBlock, rest.slice(insertPos)));
+          currentPersist();
+          currentRender();
         }
       });
       bBody.setAttribute('data-sortable', '1');

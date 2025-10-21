@@ -108,6 +108,12 @@ Defender.jpeg              # Brand image / logo
 
 ---
 
+## 3.1.4 – Quote builder deletion fix
+
+- Fixed an issue where deleted quote items would return after reordering rows; drag-sort now reads the latest basket state before applying changes.
+
+---
+
 ## 3.1.3 – Quantity field refinement
 
 - Decreased the quantity input width by 50% to tighten the quote table layout.
@@ -148,6 +154,7 @@ Defender.jpeg              # Brand image / logo
 
 ## Versioning
 
+- **3.1.4** – Quote builder deletion fix: ensured drag reordering uses the latest basket before saving changes so removed rows stay deleted.
 - **3.1.3** – Quantity field refinement: reduced the quantity input width to better balance the quote table column.
 - **3.1.2** – Visual refinement: fixed totals panel width, restored table proportions and borders, corrected catalogue header and colours, re-enabled catalogue resizing. No functional changes.
 - **3.1.1** – Sleek visual hotfix: restored compact density, realigned totals sidebar, sharpened table borders; visuals only.
