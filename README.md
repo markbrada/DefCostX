@@ -29,9 +29,8 @@ It loads an Excel workbook of products and services and lets estimators build qu
 - **Section notes** – dedicated notes field stored alongside each section in localStorage  
 - **Reorder** – drag-and-drop for items (and keep sub-items with their parent)  
 - **Totals**
-  - Floating section summary card between the basket and notes shows each section's Total, Discount %, and Grand Total with a toggle to ignore the global discount.
   - Right-aligned summary table (beneath the active section) lists **Total (Ex. GST)**, **Discount %**, **Grand Total (Ex. GST)**, **GST (10 %)**, **Grand Total (Incl. GST)**
-  - Discount % and Grand Total inputs stay in sync
+  - Discount % and Grand Total inputs stay in sync  
 - **CSV export/import** – section-aware, includes grand totals and per-section notes  
 - **Clipboard** – click any non-input cell to copy its text  
 - **Sticky header** – stable sizing with `scrollbar-gutter: stable`
@@ -109,13 +108,6 @@ Defender.jpeg              # Brand image / logo
 
 ---
 
-## 3.2.0 – Section totals summary
-
-- Added a floating per-section totals card with discount toggle and live linkage to the main totals calculator.
-- Exported CSV files now include section totals, discount percentages, and discounted grand totals.
-
----
-
 ## 3.1.4 – Quote builder deletion fix
 
 - Fixed an issue where deleted quote items would return after reordering rows; drag-sort now reads the latest basket state before applying changes.
@@ -162,7 +154,6 @@ Defender.jpeg              # Brand image / logo
 
 ## Versioning
 
-- **3.2.0** – Section totals summary: added per-section floating totals with discount toggles and mirrored CSV output.
 - **3.1.4** – Quote builder deletion fix: ensured drag reordering uses the latest basket before saving changes so removed rows stay deleted.
 - **3.1.3** – Quantity field refinement: reduced the quantity input width to better balance the quote table column.
 - **3.1.2** – Visual refinement: fixed totals panel width, restored table proportions and borders, corrected catalogue header and colours, re-enabled catalogue resizing. No functional changes.
