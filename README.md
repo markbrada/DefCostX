@@ -30,8 +30,9 @@ It loads an Excel workbook of products and services and lets estimators build qu
 - **Reorder** – drag-and-drop for items (and keep sub-items with their parent)  
 - **Totals**
   - Right-aligned summary table (beneath the active section) lists **Total (Ex. GST)**, **Discount %**, **Grand Total (Ex. GST)**, **GST (10 %)**, **Grand Total (Incl. GST)**
-  - Discount % and Grand Total inputs stay in sync  
-- **CSV export/import** – section-aware, includes grand totals and per-section notes  
+  - Discount % and Grand Total inputs stay in sync
+- Section summaries display raw totals, editable discounts, and grand total overrides with inline validation plus a reset control (dark/light aware)
+- **CSV export/import** – section-aware, includes grand totals, per-section notes, and section summary rows (Total, Discount %, Grand Total) so overrides round-trip through CSV
 - **Clipboard** – click any non-input cell to copy its text  
 - **Sticky header** – stable sizing with `scrollbar-gutter: stable`
 
@@ -48,11 +49,13 @@ It loads an Excel workbook of products and services and lets estimators build qu
 
 ## Totals Logic
 
-- **Line Total** = `qty × price` (Ex. GST)  
-- **Section Ex. GST subtotal** = sum of parent + sub-items in that section  
-- **Discounted Grand Total (Ex. GST)** = `Section Ex. GST subtotal × (1 − Discount %)`  
-- **GST (10 %)** = `Discounted Grand Total × 0.10`  
-- **Grand Total (Incl. GST)** = `Discounted Grand Total + GST`
+- **Line Total** = `qty × price` (Ex. GST)
+- **Section Total (Ex. GST)** = sum of parent + sub-items in that section (raw amount)
+- **Section Discount** – stored per section in `defcost_basket_v2` (`discountPercent`) with optional override `overrideTotalEx` for a fixed section grand total
+- **Section Grand Total (Ex. GST)** = override value if present, otherwise `Section Total × (1 − Section Discount %)`
+- **Quote Total (Ex. GST)** = sum of all section grand totals; the footer discount field displays the effective percentage derived from raw vs discounted totals
+- **GST (10 %)** = `Quote Total × 0.10`
+- **Grand Total (Incl. GST)** = `Quote Total + GST`
 
 ---
 
@@ -108,6 +111,14 @@ Defender.jpeg              # Brand image / logo
 
 ---
 
+## 3.2.0 – Per-section discount tables
+
+- Added per-section summary rows with editable discounts and optional grand total overrides that stay in sync with the footer controls.
+- Footer discount and grand total inputs now redistribute percentages to non-overridden sections and surface the effective aggregate discount.
+- CSV export/import appends three summary rows per section (Total, Discount %, Grand Total) and restores override data saved under `defcost_basket_v2`.
+
+---
+
 ## 3.1.4 – Quote builder deletion fix
 
 - Fixed an issue where deleted quote items would return after reordering rows; drag-sort now reads the latest basket state before applying changes.
@@ -154,6 +165,7 @@ Defender.jpeg              # Brand image / logo
 
 ## Versioning
 
+- **3.2.0** – Per-section discount tables: added section summaries with overrides, footer synchronization, and CSV support for the new localStorage fields.
 - **3.1.4** – Quote builder deletion fix: ensured drag reordering uses the latest basket before saving changes so removed rows stay deleted.
 - **3.1.3** – Quantity field refinement: reduced the quantity input width to better balance the quote table column.
 - **3.1.2** – Visual refinement: fixed totals panel width, restored table proportions and borders, corrected catalogue header and colours, re-enabled catalogue resizing. No functional changes.

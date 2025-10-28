@@ -757,6 +757,113 @@ thead th {
   display: none;
 }
 
+.section-summary-row {
+  background: var(--color-surface-raised);
+}
+
+.section-summary-row td {
+  padding: calc(var(--spacing-unit) * 0.85) calc(var(--spacing-unit) * 0.9);
+  border-top: 1px solid var(--color-gridline);
+}
+
+.section-summary-label {
+  font-weight: 600;
+  color: var(--color-muted);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.6);
+}
+
+.section-summary-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.section-summary-amount {
+  font-weight: 600;
+  display: inline-flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.section-summary-input {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.section-summary-input input {
+  width: 120px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.section-summary-input span {
+  color: var(--color-muted);
+  font-size: 0.82rem;
+}
+
+.section-summary-input--currency {
+  gap: 0.35rem;
+}
+
+.section-summary-input--currency input {
+  width: 140px;
+}
+
+.section-summary-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.section-summary-reset {
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: calc(var(--radius-base) - 9px);
+  transition: background-color var(--transition-base), color var(--transition-base);
+}
+
+.section-summary-reset:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.section-summary-reset:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.section-summary-message {
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--color-warning);
+}
+
+@media (max-width: 860px) {
+  .section-summary-value {
+    text-align: left;
+  }
+
+  .section-summary-input {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .section-summary-input input {
+    width: 100%;
+  }
+}
+
 .section-notes-cell {
   padding: 0 !important;
 }
