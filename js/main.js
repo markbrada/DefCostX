@@ -30,8 +30,6 @@ window.DefCost.api.formatCurrency = formatCurrency;
 window.DefCost.api.formatCurrencyWithSymbol = formatCurrencyWithSymbol;
 window.DefCost.api.saveBasket = saveBasket;
 window.DefCost.api.lineTotal = lineTotal;
-window.DefCost.api.formatPercent = formatPercent;
-window.DefCost.api.recalcGrandTotal = recalcGrandTotal;
 
 const catalogueNamespace = window.DefCost.catalogue || {};
 
@@ -300,7 +298,7 @@ function applyImportedModel(model){
     var secId=newSectionId;
     var sectionNotes=typeof src.notes==='string'?src.notes:'';
     if(sectionNotes&&sectionNotes.trim()){notesCount++;}
-    newSections.push({id:secId,name:src.title||('Section '+secId),notes:sectionNotes,discountEnabled:true});
+    newSections.push({id:secId,name:src.title||('Section '+secId),notes:sectionNotes});
     var items=Array.isArray(src.items)?src.items:[];
     for(var j=0;j<items.length;j++){
       var item=items[j];
@@ -377,7 +375,7 @@ function startResize(ev){if(!qbWindow||qbState.full||qbState.isOpen===false||qbS
 function handleResizeMove(ev){if(!resizeInfo)return;var coords=getPointerCoords(ev);if(typeof coords.clientX==='undefined')return;if(ev.cancelable)ev.preventDefault();var winW=window.innerWidth||resizeInfo.startW||800;var winH=window.innerHeight||resizeInfo.startH||600;var deltaX=coords.clientX-resizeInfo.startX;var deltaY=coords.clientY-resizeInfo.startY;var minW=320;var minH=280;var maxW=winW-(isFinite(qbState.x)?qbState.x:0);var maxH=winH-(isFinite(qbState.y)?qbState.y:0);if(!isFinite(maxW)||maxW<minW)maxW=winW;if(!isFinite(maxH)||maxH<minH)maxH=winH;var newW=(resizeInfo.startW||minW)+deltaX;var newH=(resizeInfo.startH||minH)+deltaY;if(newW<minW)newW=minW;if(newH<minH)newH=minH;if(newW>maxW)newW=maxW;if(newH>maxH)newH=maxH;qbState.w=newW;qbState.h=newH;qbWindow.classList.add('qb-floating');qbWindow.classList.remove('qb-full');qbWindow.style.width=newW+'px';qbWindow.style.height=newH+'px';applyQBState(true);}
 function endResize(){if(!resizeInfo)return;document.body.style.userSelect=prevUserSelect||'';document.removeEventListener('mousemove',handleResizeMove);document.removeEventListener('mouseup',endResize);document.removeEventListener('touchmove',handleResizeMove);document.removeEventListener('touchend',endResize);document.removeEventListener('touchcancel',endResize);resizeInfo=null;ensureWindowWithinViewport(true);if(catalogueNamespace&&typeof catalogueNamespace.persistState==='function'){catalogueNamespace.persistState();}rememberCurrentRect();}
 function escapeHtml(s){s=String(s==null?'':s);return s.replace(/[&<>"']/g,function(m){switch(m){case'&':return'&amp;';case'<':return'&lt;';case'>':return'&gt;';case'"':return'&quot;';default:return'&#39;';}});}
-function getDefaultSections(){return [{id:1,name:'Section 1',notes:'',discountEnabled:true}];}
+function getDefaultSections(){return [{id:1,name:'Section 1',notes:''}];}
 function ensureSectionState(){
   if(!Array.isArray(sections)||!sections.length){
     sections=getDefaultSections();
@@ -403,11 +401,6 @@ function ensureSectionState(){
     }
     if(typeof sec.notes!=='string'){
       sec.notes='';
-    }
-    if(typeof sec.discountEnabled==='undefined'){
-      sec.discountEnabled=true;
-    }else{
-      sec.discountEnabled=!!sec.discountEnabled;
     }
   }
   if(!sections.length){
@@ -458,9 +451,6 @@ function normalizeBasketItems(){
     }
   }
 }
-function getReportSections(report){return report&&Array.isArray(report.sections)?report.sections:[];}
-function computeSectionDiscountBreakdown(report){var enabled=0,disabled=0,list=getReportSections(report);for(var i=0;i<list.length;i++){var sec=list[i];if(!sec)continue;var subtotal=isFinite(sec.subtotalEx)?sec.subtotalEx:0;if(sec.discountEnabled===false){disabled+=subtotal;}else{enabled+=subtotal;}}return{enabled:enabled,disabled:disabled};}
-function calculateDiscountedGrandTotal(report,discount){var breakdown=computeSectionDiscountBreakdown(report);var enabledTotal=breakdown.enabled;var disabledTotal=breakdown.disabled;var discounted=recalcGrandTotal(enabledTotal,isFinite(discount)?discount:0);return roundCurrency(disabledTotal+discounted);}
 function ensureGrandTotalsUi(){if(!grandTotalsEl||grandTotalsUi)return;if(!grandTotalsEl)return;grandTotalsEl.innerHTML='<table class="grand-totals-table" aria-label="Quote totals"><tbody><tr><th scope="row">Total</th><td class="totals-value" data-role="total-value">0.00</td></tr><tr><th scope="row">Discount (%)</th><td><div class="grand-totals-input"><input type="number" step="0.01" inputmode="decimal" aria-label="Discount percentage" data-role="discount-input"><span>%</span></div></td></tr><tr><th scope="row">Grand Total</th><td><div class="grand-totals-input"><input type="number" min="0" step="0.01" inputmode="decimal" aria-label="Grand total after discount" data-role="grand-total-input"></div></td></tr><tr><th scope="row">GST (10%)</th><td class="totals-value" data-role="gst-value">0.00</td></tr><tr><th scope="row">Grand Total (Incl. GST)</th><td class="totals-value" data-role="grand-incl-value">0.00</td></tr></tbody></table>';
   var discountInput=grandTotalsEl.querySelector('[data-role="discount-input"]');
   var grandTotalInput=grandTotalsEl.querySelector('[data-role="grand-total-input"]');
@@ -468,8 +458,8 @@ function ensureGrandTotalsUi(){if(!grandTotalsEl||grandTotalsUi)return;if(!grand
   if(discountInput){discountInput.addEventListener('input',handleDiscountChange);}
   if(grandTotalInput){grandTotalInput.addEventListener('input',handleGrandTotalChange);}
 }
-function handleDiscountChange(){if(!grandTotalsUi)return;var base=latestReport&&isFinite(latestReport.grandEx)?latestReport.grandEx:0;var raw=parseFloat(grandTotalsUi.discountInput.value);if(!isFinite(raw))raw=0;discountPercent=raw;var nextTotal=latestReport?calculateDiscountedGrandTotal(latestReport,discountPercent):recalcGrandTotal(base,discountPercent);if(!isFinite(nextTotal))nextTotal=0;currentGrandTotal=nextTotal;lastBaseTotal=base;updateGrandTotals(latestReport,{preserveGrandTotal:true});persistBasket();if(window.DefCost&&window.DefCost.ui&&typeof window.DefCost.ui.renderBasket==='function'){window.DefCost.ui.renderBasket();}}
-function handleGrandTotalChange(){if(!grandTotalsUi)return;var base=latestReport&&isFinite(latestReport.grandEx)?latestReport.grandEx:0;var raw=parseFloat(grandTotalsUi.grandTotalInput.value);if(!isFinite(raw))raw=0;raw=Math.max(0,raw);currentGrandTotal=roundCurrency(raw);var breakdown=latestReport?computeSectionDiscountBreakdown(latestReport):{enabled:base,disabled:0};var enabledTotal=isFinite(breakdown.enabled)?breakdown.enabled:0;var disabledTotal=isFinite(breakdown.disabled)?breakdown.disabled:0;var minTotal=roundCurrency(disabledTotal);if(currentGrandTotal<minTotal){currentGrandTotal=minTotal;}if(enabledTotal>0){var adjustable=currentGrandTotal-minTotal;var ratio=adjustable/(enabledTotal||1);discountPercent=(1-ratio)*100;}else{discountPercent=0;currentGrandTotal=minTotal;}if(!isFinite(discountPercent))discountPercent=0;lastBaseTotal=base;updateGrandTotals(latestReport,{preserveGrandTotal:true});persistBasket();if(window.DefCost&&window.DefCost.ui&&typeof window.DefCost.ui.renderBasket==='function'){window.DefCost.ui.renderBasket();}}
+function handleDiscountChange(){if(!grandTotalsUi)return;var base=latestReport&&isFinite(latestReport.grandEx)?latestReport.grandEx:0;var raw=parseFloat(grandTotalsUi.discountInput.value);if(!isFinite(raw))raw=0;discountPercent=raw;currentGrandTotal=recalcGrandTotal(base,discountPercent);lastBaseTotal=base;updateGrandTotals(latestReport,{preserveGrandTotal:true});persistBasket();}
+function handleGrandTotalChange(){if(!grandTotalsUi)return;var base=latestReport&&isFinite(latestReport.grandEx)?latestReport.grandEx:0;var raw=parseFloat(grandTotalsUi.grandTotalInput.value);if(!isFinite(raw))raw=0;raw=Math.max(0,raw);currentGrandTotal=roundCurrency(raw);if(base>0){discountPercent=(1-currentGrandTotal/(base||1))*100;}else{discountPercent=0;}lastBaseTotal=base;updateGrandTotals(latestReport,{preserveGrandTotal:true});persistBasket();}
 function updateGrandTotals(report,opts){
   latestReport=report||null;
   if(!grandTotalsEl)return;
@@ -766,7 +756,7 @@ if(bFootEl){
     navigator.clipboard.writeText(text).then(function(){ td.classList.add('copied-cell'); void td.offsetWidth; setTimeout(function(){ td.classList.remove('copied-cell'); },150); }).catch(function(){});
   });
 }
-if(addSectionBtn){addSectionBtn.addEventListener('click',function(){ensureSectionState();var suggestion='Section '+(sectionSeq+1);var name=prompt('Section name',suggestion);if(name===null)return;name=name.trim();if(!name){showToast('Section name is required');return;}var nameNorm=normalizeSectionName(name);var exists=sections.some(function(sec){return sec&&normalizeSectionName(sec.name)===nameNorm;});if(exists){showToast('A section named “'+name+'” already exists.');return;}var newId=sectionSeq+1;sections.push({id:newId,name:name,notes:'',discountEnabled:true});sectionSeq=newId;activeSectionId=newId;captureParentId=null;window.DefCost.ui.renderBasket();showToast('Section added');});}
+if(addSectionBtn){addSectionBtn.addEventListener('click',function(){ensureSectionState();var suggestion='Section '+(sectionSeq+1);var name=prompt('Section name',suggestion);if(name===null)return;name=name.trim();if(!name){showToast('Section name is required');return;}var nameNorm=normalizeSectionName(name);var exists=sections.some(function(sec){return sec&&normalizeSectionName(sec.name)===nameNorm;});if(exists){showToast('A section named “'+name+'” already exists.');return;}var newId=sectionSeq+1;sections.push({id:newId,name:name,notes:''});sectionSeq=newId;activeSectionId=newId;captureParentId=null;window.DefCost.ui.renderBasket();showToast('Section added');});}
 if(importBtn&&importInput){
   importBtn.addEventListener('click',function(){
     importInput.value='';

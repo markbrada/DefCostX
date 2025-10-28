@@ -757,45 +757,6 @@ thead th {
   display: none;
 }
 
-.section-summary-cell {
-  padding: calc(var(--spacing-unit) * 0.75) !important;
-  border: none;
-}
-
-.section-totals-wrapper {
-  display: flex;
-  margin-bottom: calc(var(--spacing-unit) * 0.5);
-}
-
-.section-totals-wrapper .grand-totals-table {
-  margin: 0;
-}
-
-.section-totals-wrapper .grand-totals-input {
-  gap: 0.5rem;
-}
-
-.section-totals-wrapper .grand-totals-input .section-percent {
-  display: inline;
-}
-
-.section-discount-control input[readonly],
-.section-grand-total-display input[readonly] {
-  pointer-events: none;
-}
-
-.section-discount-control .section-discount-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  color: var(--color-muted);
-}
-
-.section-discount-control .section-discount-toggle input {
-  width: 1rem;
-  height: 1rem;
-}
-
 .section-notes-cell {
   padding: 0 !important;
 }

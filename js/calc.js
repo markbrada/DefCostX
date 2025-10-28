@@ -89,11 +89,9 @@ export function buildReportModel(basket, sections) {
     const source = sectionsById[id];
     if (secMap[id]) {
       secMap[id].notes = source && typeof source.notes === 'string' ? source.notes : '';
-      secMap[id].discountEnabled = source && source.discountEnabled === false ? false : true;
       return secMap[id];
     }
     const name = source ? source.name : 'Section ' + id;
-    const discountEnabled = source && source.discountEnabled === false ? false : true;
     secMap[id] = {
       id: id,
       name: name,
@@ -101,8 +99,7 @@ export function buildReportModel(basket, sections) {
       subtotalEx: 0,
       subtotalGst: 0,
       subtotalTotal: 0,
-      notes: source && typeof source.notes === 'string' ? source.notes : '',
-      discountEnabled: discountEnabled
+      notes: source && typeof source.notes === 'string' ? source.notes : ''
     };
     return secMap[id];
   }
@@ -153,8 +150,7 @@ export function buildReportModel(basket, sections) {
       subtotalEx: 0,
       subtotalGst: 0,
       subtotalTotal: 0,
-      notes: base && typeof base.notes === 'string' ? base.notes : '',
-      discountEnabled: base && base.discountEnabled === false ? false : true
+      notes: base && typeof base.notes === 'string' ? base.notes : ''
     });
   }
 
@@ -186,24 +182,6 @@ export function computeGrandTotalsState({
   const base = report && isFinite(report.grandEx) ? report.grandEx : 0;
   const hasItems = basketCount > 0;
   const discount = isFinite(discountPercent) ? discountPercent : 0;
-  const sections = report && Array.isArray(report.sections) ? report.sections : [];
-  let enabledTotal = 0;
-  let disabledTotal = 0;
-  for (let i = 0; i < sections.length; i++) {
-    const sec = sections[i];
-    if (!sec) {
-      continue;
-    }
-    const subtotal = isFinite(sec.subtotalEx) ? sec.subtotalEx : 0;
-    if (sec.discountEnabled === false) {
-      disabledTotal += subtotal;
-    } else {
-      enabledTotal += subtotal;
-    }
-  }
-  enabledTotal = roundCurrency(enabledTotal);
-  disabledTotal = roundCurrency(disabledTotal);
-
   let nextGrandTotal = isFinite(currentGrandTotal) ? roundCurrency(currentGrandTotal) : 0;
   let nextLastBase = isFinite(lastBaseTotal) ? lastBaseTotal : 0;
   let gstAmount = 0;
@@ -221,15 +199,8 @@ export function computeGrandTotalsState({
     };
   }
 
-  const shouldRecalculate = !preserveGrandTotal || !isFinite(nextGrandTotal);
-  if (shouldRecalculate) {
-    const discountedEnabled = recalcGrandTotal(enabledTotal, discount);
-    nextGrandTotal = roundCurrency(disabledTotal + discountedEnabled);
-  } else {
-    const minimumTotal = roundCurrency(disabledTotal);
-    if (nextGrandTotal < minimumTotal) {
-      nextGrandTotal = minimumTotal;
-    }
+  if (!preserveGrandTotal && Math.abs(base - nextLastBase) > 0.005) {
+    nextGrandTotal = recalcGrandTotal(base, discount);
   }
 
   nextLastBase = base;
