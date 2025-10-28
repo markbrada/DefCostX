@@ -92,7 +92,7 @@ var PRICE_EX=["Rate Ex. GST","Price Ex. GST","Price","Price Ex Tax","Price ex GS
 var UNDO_TOAST_MS=60000;
 var wb=null,sheetCache={},basket=[],sections=getDefaultSections(),uid=0,sectionSeq=1,activeSectionId=sections[0].id,captureParentId=null;
 var tabs=document.getElementById("sheetTabs"),container=document.getElementById("sheetContainer"),sectionTabsEl=document.getElementById("sectionTabs"),grandTotalsEl=document.getElementById("grandTotals"),grandTotalsWrap=document.querySelector('.grand-totals-wrapper');
-var discountPercent=0,currentGrandTotal=0,lastBaseTotal=0,grandTotalsUi=null,latestReport=null,effectiveDiscountPercent=0;
+var discountPercent=0,currentGrandTotal=0,lastBaseTotal=0,grandTotalsUi=null,latestReport=null;
 var qbWindow=document.getElementById('catalogWindow'),qbTitlebar=document.getElementById('catalogTitlebar'),qbDockIcon=document.getElementById('catalogDockIcon'),qbMin=document.getElementById('catalogMin'),qbClose=document.getElementById('catalogClose'),qbZoom=document.getElementById('catalogZoom'),qbResizeHandle=document.getElementById('catalogResizeHandle');
 var addSectionBtn=document.getElementById("addSectionBtn"),importBtn=document.getElementById('importCsvBtn'),importInput=document.getElementById('importCsvInput'),qbTitle=document.getElementById('qbTitle'),clearQuoteBtn=document.getElementById('clearQuoteBtn');
 if(catalogueNamespace&&typeof catalogueNamespace.restoreState==='function'){catalogueNamespace.restoreState({element:qbWindow,dockIcon:qbDockIcon});}
@@ -298,9 +298,7 @@ function applyImportedModel(model){
     var secId=newSectionId;
     var sectionNotes=typeof src.notes==='string'?src.notes:'';
     if(sectionNotes&&sectionNotes.trim()){notesCount++;}
-    var sectionDiscount=isFinite(src&&src.discountPercent)?roundCurrency(src.discountPercent):0;
-    var sectionOverride=isFinite(src&&src.overrideTotalEx)?roundCurrency(Math.max(0,src.overrideTotalEx)):null;
-    newSections.push({id:secId,name:src.title||('Section '+secId),notes:sectionNotes,discountPercent:sectionDiscount,overrideTotalEx:sectionOverride});
+    newSections.push({id:secId,name:src.title||('Section '+secId),notes:sectionNotes});
     var items=Array.isArray(src.items)?src.items:[];
     for(var j=0;j<items.length;j++){
       var item=items[j];
@@ -404,21 +402,6 @@ function ensureSectionState(){
     if(typeof sec.notes!=='string'){
       sec.notes='';
     }
-    if(typeof sec.discountPercent==='undefined'||!isFinite(sec.discountPercent)){
-      sec.discountPercent=isFinite(discountPercent)?roundCurrency(discountPercent):0;
-    }else{
-      if(sec.discountPercent<0) sec.discountPercent=0;
-      if(sec.discountPercent>100) sec.discountPercent=100;
-      sec.discountPercent=roundCurrency(sec.discountPercent);
-    }
-    if(typeof sec.overrideTotalEx==='string'){
-      var parsedOverride=parseFloat(sec.overrideTotalEx);
-      sec.overrideTotalEx=isFinite(parsedOverride)?roundCurrency(Math.max(0,parsedOverride)):null;
-    }else if(!isFinite(sec.overrideTotalEx)){
-      sec.overrideTotalEx=null;
-    }else{
-      sec.overrideTotalEx=roundCurrency(Math.max(0,sec.overrideTotalEx));
-    }
   }
   if(!sections.length){
     sections=getDefaultSections();
@@ -428,93 +411,6 @@ function ensureSectionState(){
   if(typeof activeSectionId==='undefined'||!sections.some(function(sec){return sec.id===activeSectionId;})){
     activeSectionId=sections[0].id;
   }
-}
-
-function applyPercentToSections(nextPercent){
-  var changed=false;
-  var targetPercent=isFinite(nextPercent)?roundCurrency(nextPercent):0;
-  for(var i=0;i<sections.length;i++){
-    var sec=sections[i];
-    if(!sec) continue;
-    if(sec.overrideTotalEx!==null&&isFinite(sec.overrideTotalEx)){
-      continue;
-    }
-    var current=isFinite(sec.discountPercent)?roundCurrency(sec.discountPercent):0;
-    if(Math.abs(current-targetPercent)>0.005){
-      sec.discountPercent=targetPercent;
-      changed=true;
-    }
-  }
-  return changed;
-}
-
-function distributeGrandTotalAcrossSections(targetTotal){
-  ensureSectionState();
-  var report=buildReportModel(basket,sections);
-  var sectionMeta={};
-  if(report&&Array.isArray(report.sections)){
-    for(var s=0;s<report.sections.length;s++){
-      sectionMeta[report.sections[s].id]=report.sections[s];
-    }
-  }
-
-  var overridesFloor=0;
-  var adjustableRaw=0;
-  for(var i=0;i<sections.length;i++){
-    var sec=sections[i];
-    if(!sec) continue;
-    var meta=sectionMeta[sec.id];
-    var rawTotal=meta&&isFinite(meta.rawTotalEx)?meta.rawTotalEx:0;
-    if(sec.overrideTotalEx!==null&&isFinite(sec.overrideTotalEx)){
-      var overrideAmount=meta&&isFinite(meta.discountedEx)?meta.discountedEx:roundCurrency(sec.overrideTotalEx);
-      overridesFloor+=overrideAmount;
-    }else{
-      adjustableRaw+=rawTotal;
-    }
-  }
-
-  var desired=roundCurrency(isFinite(targetTotal)?Math.max(0,targetTotal):0);
-  var warning='';
-  var clamped=false;
-  if(desired<roundCurrency(overridesFloor)){
-    desired=roundCurrency(overridesFloor);
-    warning='Grand total cannot drop below section overrides.';
-    clamped=true;
-  }
-
-  if(adjustableRaw<=0){
-    currentGrandTotal=roundCurrency(desired);
-    return { actual: roundCurrency(overridesFloor), clamped: clamped, message: warning };
-  }
-
-  var requiredForAdjustable=desired-overridesFloor;
-  var ratio=adjustableRaw>0?requiredForAdjustable/adjustableRaw:0;
-  var percent=(1-ratio)*100;
-  var preClampPercent=percent;
-  if(percent<0){
-    percent=0;
-    clamped=true;
-    warning=warning||'Section discounts reduced to 0% to meet target.';
-  }
-  if(percent>100){
-    percent=100;
-    clamped=true;
-    warning=warning||'Section discounts capped at 100%.';
-  }
-  percent=roundCurrency(percent);
-
-  applyPercentToSections(percent);
-  discountPercent=percent;
-
-  var adjustedPortion=roundCurrency(adjustableRaw*(1-percent/100));
-  var finalTotal=roundCurrency(overridesFloor+adjustedPortion);
-  currentGrandTotal=finalTotal;
-
-  if(!clamped&&Math.abs(percent-preClampPercent)>0.005){
-    clamped=true;
-  }
-
-  return { actual: finalTotal, clamped: clamped, message: warning };
 }
 function normalizeBasketItems(){
   uid=0;
@@ -559,43 +455,11 @@ function ensureGrandTotalsUi(){if(!grandTotalsEl||grandTotalsUi)return;if(!grand
   var discountInput=grandTotalsEl.querySelector('[data-role="discount-input"]');
   var grandTotalInput=grandTotalsEl.querySelector('[data-role="grand-total-input"]');
   grandTotalsUi={container:grandTotalsEl,totalValue:grandTotalsEl.querySelector('[data-role="total-value"]'),discountInput:discountInput,grandTotalInput:grandTotalInput,gstValue:grandTotalsEl.querySelector('[data-role="gst-value"]'),grandInclValue:grandTotalsEl.querySelector('[data-role="grand-incl-value"]')};
-  if(discountInput){discountInput.addEventListener('change',handleDiscountChange);}
-  if(grandTotalInput){grandTotalInput.addEventListener('change',handleGrandTotalChange);}
+  if(discountInput){discountInput.addEventListener('input',handleDiscountChange);}
+  if(grandTotalInput){grandTotalInput.addEventListener('input',handleGrandTotalChange);}
 }
-function handleDiscountChange(){
-  if(!grandTotalsUi)return;
-  var raw=parseFloat(grandTotalsUi.discountInput.value);
-  if(!isFinite(raw)) raw=0;
-  var original=raw;
-  if(raw<0) raw=0;
-  if(raw>100) raw=100;
-  var clamped=Math.abs(raw-original)>0.0005;
-  discountPercent=roundCurrency(raw);
-  var changed=applyPercentToSections(discountPercent);
-  currentGrandTotal=0;
-  if(typeof showToast==='function'){
-    if(clamped){
-      showToast('Section discount applied (clamped to '+formatPercent(discountPercent)+'%).');
-    }else if(changed){
-      showToast('Section discount applied');
-    }
-  }
-  window.DefCost.ui.renderBasket();
-}
-function handleGrandTotalChange(){
-  if(!grandTotalsUi)return;
-  var raw=parseFloat(grandTotalsUi.grandTotalInput.value);
-  if(!isFinite(raw)) raw=0;
-  var result=distributeGrandTotalAcrossSections(raw);
-  if(typeof showToast==='function'){
-    if(result&&result.clamped){
-      showToast(result.message||'Section discount applied with limits.');
-    }else{
-      showToast('Section discount applied');
-    }
-  }
-  window.DefCost.ui.renderBasket();
-}
+function handleDiscountChange(){if(!grandTotalsUi)return;var base=latestReport&&isFinite(latestReport.grandEx)?latestReport.grandEx:0;var raw=parseFloat(grandTotalsUi.discountInput.value);if(!isFinite(raw))raw=0;discountPercent=raw;currentGrandTotal=recalcGrandTotal(base,discountPercent);lastBaseTotal=base;updateGrandTotals(latestReport,{preserveGrandTotal:true});persistBasket();}
+function handleGrandTotalChange(){if(!grandTotalsUi)return;var base=latestReport&&isFinite(latestReport.grandEx)?latestReport.grandEx:0;var raw=parseFloat(grandTotalsUi.grandTotalInput.value);if(!isFinite(raw))raw=0;raw=Math.max(0,raw);currentGrandTotal=roundCurrency(raw);if(base>0){discountPercent=(1-currentGrandTotal/(base||1))*100;}else{discountPercent=0;}lastBaseTotal=base;updateGrandTotals(latestReport,{preserveGrandTotal:true});persistBasket();}
 function updateGrandTotals(report,opts){
   latestReport=report||null;
   if(!grandTotalsEl)return;
@@ -627,8 +491,6 @@ function updateGrandTotals(report,opts){
       grandTotalsUi.grandTotalInput.disabled=true;
       grandTotalsUi.grandTotalInput.value=formatCurrency(0);
     }
-    effectiveDiscountPercent=0;
-    currentGrandTotal=0;
     return;
   }
   if(grandTotalsWrap) grandTotalsWrap.style.display='flex';
@@ -636,18 +498,17 @@ function updateGrandTotals(report,opts){
   currentGrandTotal=state.currentGrandTotal;
   lastBaseTotal=state.lastBaseTotal;
   var base=state.base;
-  effectiveDiscountPercent=state.discountPercent;
   if(grandTotalsUi.totalValue)grandTotalsUi.totalValue.textContent=formatCurrency(base);
   if(grandTotalsUi.discountInput){
     grandTotalsUi.discountInput.disabled=false;
     if(document.activeElement!==grandTotalsUi.discountInput){
-      grandTotalsUi.discountInput.value=formatPercent(state.discountPercent);
+      grandTotalsUi.discountInput.value=formatPercent(discountPercent);
     }
   }
   if(grandTotalsUi.grandTotalInput){
     grandTotalsUi.grandTotalInput.disabled=false;
     if(document.activeElement!==grandTotalsUi.grandTotalInput){
-      grandTotalsUi.grandTotalInput.value=formatCurrency(state.currentGrandTotal);
+      grandTotalsUi.grandTotalInput.value=formatCurrency(currentGrandTotal);
     }
   }
   if(grandTotalsUi.gstValue)grandTotalsUi.gstValue.textContent=formatCurrency(state.gstAmount);
