@@ -76,6 +76,41 @@ export function buildReportModel(basket, sections) {
     sectionsById[safeSections[i].id] = safeSections[i];
   }
 
+  const sanitizePercent = (value) => {
+    if (value == null || value === '') {
+      return 0;
+    }
+    const num = parseFloat(value);
+    if (!isFinite(num)) {
+      return 0;
+    }
+    if (num < 0) {
+      return 0;
+    }
+    if (num > 100) {
+      return 100;
+    }
+    return roundCurrency(num);
+  };
+
+  const sanitizeOverride = (value) => {
+    if (value == null || value === '') {
+      return null;
+    }
+    const num = parseFloat(value);
+    if (!isFinite(num)) {
+      return null;
+    }
+    return roundCurrency(Math.max(0, num));
+  };
+
+  const overridesById = {};
+  for (const key in sectionsById) {
+    if (Object.prototype.hasOwnProperty.call(sectionsById, key)) {
+      overridesById[key] = sanitizeOverride(sectionsById[key].overrideTotalEx);
+    }
+  }
+
   const childMap = {};
   for (let i = 0; i < (basket ? basket.length : 0); i++) {
     const entry = basket[i];
@@ -96,9 +131,13 @@ export function buildReportModel(basket, sections) {
       id: id,
       name: name,
       items: [],
-      subtotalEx: 0,
-      subtotalGst: 0,
-      subtotalTotal: 0,
+      rawTotalEx: 0,
+      sectionDiscountPercent: sanitizePercent(source && source.discountPercent),
+      discountedEx: 0,
+      discountValueEx: 0,
+      effectiveDiscountPercent: 0,
+      overrideTotalEx: null,
+      hasOverride: false,
       notes: source && typeof source.notes === 'string' ? source.notes : ''
     };
     return secMap[id];
@@ -106,10 +145,7 @@ export function buildReportModel(basket, sections) {
 
   function addAmounts(obj, qty, ex) {
     const lineEx = lineTotal(qty, ex);
-    const gst = lineEx * GST_RATE;
-    obj.subtotalEx += lineEx;
-    obj.subtotalGst += gst;
-    obj.subtotalTotal += lineEx + gst;
+    obj.rawTotalEx += lineEx;
   }
 
   for (let i = 0; i < (basket ? basket.length : 0); i++) {
@@ -154,20 +190,57 @@ export function buildReportModel(basket, sections) {
     });
   }
 
-  let grandEx = 0;
-  let grandGst = 0;
-  let grandTotal = 0;
+  let totalRawEx = 0;
+  let totalDiscountedEx = 0;
+
   for (let s = 0; s < orderedSections.length; s++) {
-    grandEx += orderedSections[s].subtotalEx;
-    grandGst += orderedSections[s].subtotalGst;
-    grandTotal += orderedSections[s].subtotalTotal;
+    const section = orderedSections[s];
+    const rawTotal = roundCurrency(section.rawTotalEx);
+    const basePercent = sanitizePercent(section.sectionDiscountPercent);
+    const overrideCandidate = overridesById[section.id];
+
+    let discounted = roundCurrency(rawTotal * (1 - basePercent / 100));
+    let overrideApplied = false;
+
+    if (overrideCandidate != null) {
+      const clampedOverride = roundCurrency(Math.min(Math.max(0, overrideCandidate), rawTotal));
+      discounted = clampedOverride;
+      overrideApplied = true;
+      section.overrideTotalEx = clampedOverride;
+    } else {
+      section.overrideTotalEx = null;
+    }
+
+    section.hasOverride = overrideApplied;
+    section.rawTotalEx = rawTotal;
+    section.sectionDiscountPercent = basePercent;
+    section.discountedEx = discounted;
+    section.discountValueEx = roundCurrency(rawTotal - discounted);
+    section.effectiveDiscountPercent = rawTotal > 0
+      ? roundCurrency((section.discountValueEx / rawTotal) * 100)
+      : 0;
+
+    totalRawEx += rawTotal;
+    totalDiscountedEx += discounted;
   }
+
+  totalRawEx = roundCurrency(totalRawEx);
+  totalDiscountedEx = roundCurrency(totalDiscountedEx);
+  const discountValue = roundCurrency(totalRawEx - totalDiscountedEx);
+  const effectiveDiscountPercent = totalRawEx > 0
+    ? roundCurrency((discountValue / totalRawEx) * 100)
+    : 0;
+  const grandGst = calculateGst(totalDiscountedEx);
+  const grandIncl = roundCurrency(totalDiscountedEx + grandGst);
 
   return {
     sections: orderedSections,
-    grandEx: grandEx,
+    grandEx: totalRawEx,
     grandGst: grandGst,
-    grandTotal: grandTotal
+    grandTotal: grandIncl,
+    discountedEx: totalDiscountedEx,
+    discountValueEx: discountValue,
+    effectiveDiscountPercent: effectiveDiscountPercent
   };
 }
 
@@ -179,11 +252,16 @@ export function computeGrandTotalsState({
   lastBaseTotal,
   preserveGrandTotal
 }) {
-  const base = report && isFinite(report.grandEx) ? report.grandEx : 0;
+  const base = report && isFinite(report.grandEx) ? roundCurrency(report.grandEx) : 0;
+  const discountedEx = report && isFinite(report.discountedEx) ? roundCurrency(report.discountedEx) : 0;
   const hasItems = basketCount > 0;
-  const discount = isFinite(discountPercent) ? discountPercent : 0;
-  let nextGrandTotal = isFinite(currentGrandTotal) ? roundCurrency(currentGrandTotal) : 0;
-  let nextLastBase = isFinite(lastBaseTotal) ? lastBaseTotal : 0;
+  const discount = report && isFinite(report.effectiveDiscountPercent)
+    ? report.effectiveDiscountPercent
+    : (base > 0 ? roundCurrency((1 - (discountedEx / (base || 1))) * 100) : 0);
+  let nextGrandTotal = preserveGrandTotal && isFinite(currentGrandTotal)
+    ? roundCurrency(currentGrandTotal)
+    : discountedEx;
+  let nextLastBase = base;
   let gstAmount = 0;
   let grandIncl = 0;
 
@@ -195,15 +273,11 @@ export function computeGrandTotalsState({
       currentGrandTotal: 0,
       lastBaseTotal: 0,
       gstAmount: 0,
-      grandIncl: 0
+      grandIncl: 0,
+      discountedEx: 0
     };
   }
 
-  if (!preserveGrandTotal && Math.abs(base - nextLastBase) > 0.005) {
-    nextGrandTotal = recalcGrandTotal(base, discount);
-  }
-
-  nextLastBase = base;
   gstAmount = calculateGst(nextGrandTotal);
   grandIncl = roundCurrency(nextGrandTotal + gstAmount);
 
@@ -214,7 +288,8 @@ export function computeGrandTotalsState({
     currentGrandTotal: nextGrandTotal,
     lastBaseTotal: nextLastBase,
     gstAmount: gstAmount,
-    grandIncl: grandIncl
+    grandIncl: grandIncl,
+    discountedEx: nextGrandTotal
   };
 }
 

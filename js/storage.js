@@ -18,6 +18,11 @@ export const SUMMARY_ROWS = {
   'GST': 1,
   'Grand Total (Incl. GST)': 1
 };
+export const SECTION_SUMMARY_ROWS = {
+  'Section Total (Ex GST)': 'total',
+  'Section Discount (%)': 'percent',
+  'Section Grand Total (Ex GST)': 'grand'
+};
 
 export function saveBasket({
   basket,
@@ -179,6 +184,8 @@ export function buildImportModel(rows) {
   const sectionMap = {};
   const lastParentBySection = {};
   const pendingNotes = {};
+  const sectionSummaries = {};
+  const rawTotalsBySection = {};
   let discountPercentValue = null;
 
   for (let i = 1; i < rows.length; i++) {
@@ -232,10 +239,32 @@ export function buildImportModel(rows) {
 
     let section = sectionMap[sectionCell];
     if (!section) {
-      section = { title: sectionCell, items: [], notes: '' };
+      section = { title: sectionCell, items: [], notes: '', discountPercent: 0, overrideTotalEx: null };
       sectionMap[sectionCell] = section;
       sectionsModel.push(section);
       lastParentBySection[sectionCell] = null;
+    }
+
+    const summaryLabel = row[1] == null ? '' : String(row[1]).trim();
+    const summaryType = SECTION_SUMMARY_ROWS[summaryLabel];
+    if (summaryType) {
+      const summaryStore = sectionSummaries[sectionCell] || (sectionSummaries[sectionCell] = {});
+      const rawValue = row[4] == null ? '' : String(row[4]).trim();
+      if (rawValue) {
+        const cleaned = rawValue.replace(/[$,%\s]/g, '');
+        const parsed = parseFloat(cleaned);
+        if (isFinite(parsed)) {
+          const rounded = roundCurrency(parsed);
+          if (summaryType === 'total') {
+            summaryStore.raw = rounded;
+          } else if (summaryType === 'percent') {
+            summaryStore.percent = rounded;
+          } else if (summaryType === 'grand') {
+            summaryStore.grand = rounded;
+          }
+        }
+      }
+      continue;
     }
 
     const rawItem = row[1] == null ? '' : String(row[1]);
@@ -262,10 +291,14 @@ export function buildImportModel(rows) {
         continue;
       }
       parent.children.push({ name: itemName, qty: qtyInfo.value, price: priceInfo.value });
+      const subLineTotal = lineTotal(qtyInfo.value, priceInfo.value);
+      rawTotalsBySection[sectionCell] = (rawTotalsBySection[sectionCell] || 0) + subLineTotal;
     } else {
       const parentItem = { name: itemName, qty: qtyInfo.value, price: priceInfo.value, children: [] };
       section.items.push(parentItem);
       lastParentBySection[sectionCell] = parentItem;
+      const parentLineTotal = lineTotal(qtyInfo.value, priceInfo.value);
+      rawTotalsBySection[sectionCell] = (rawTotalsBySection[sectionCell] || 0) + parentLineTotal;
     }
   }
 
@@ -281,6 +314,51 @@ export function buildImportModel(rows) {
       issues.push('Row ' + pendingNotes[key].row + ': Notes row references missing Section ' + noteIndex);
     }
   }
+
+  let aggregateRaw = 0;
+  let aggregateDiscounted = 0;
+
+  for (let s = 0; s < sectionsModel.length; s++) {
+    const section = sectionsModel[s];
+    const key = section.title;
+    const summary = sectionSummaries[key] || {};
+
+    const rawFromSummary = typeof summary.raw === 'number'
+      ? summary.raw
+      : roundCurrency(rawTotalsBySection[key] || 0);
+    rawTotalsBySection[key] = rawFromSummary;
+
+    const percentFromSummary = typeof summary.percent === 'number' ? summary.percent : null;
+    if (percentFromSummary !== null) {
+      section.discountPercent = percentFromSummary;
+    } else if (discountPercentValue !== null && isFinite(discountPercentValue)) {
+      section.discountPercent = roundCurrency(discountPercentValue);
+    } else if (!isFinite(section.discountPercent)) {
+      section.discountPercent = 0;
+    }
+
+    const expectedDiscounted = roundCurrency(rawFromSummary * (1 - (section.discountPercent || 0) / 100));
+    const grandFromSummary = typeof summary.grand === 'number' ? summary.grand : null;
+    if (grandFromSummary !== null && Math.abs(grandFromSummary - expectedDiscounted) > 0.005) {
+      section.overrideTotalEx = grandFromSummary;
+    } else {
+      section.overrideTotalEx = null;
+    }
+
+    aggregateRaw += rawFromSummary;
+    if (section.overrideTotalEx !== null && isFinite(section.overrideTotalEx)) {
+      aggregateDiscounted += roundCurrency(section.overrideTotalEx);
+    } else {
+      aggregateDiscounted += expectedDiscounted;
+    }
+  }
+
+  aggregateRaw = roundCurrency(aggregateRaw);
+  aggregateDiscounted = roundCurrency(aggregateDiscounted);
+  const aggregatePercent = aggregateRaw > 0
+    ? roundCurrency((1 - (aggregateDiscounted / (aggregateRaw || 1))) * 100)
+    : 0;
+  discountPercentValue = aggregatePercent;
 
   if (!sectionsModel.length) {
     issues.push('No section data found in CSV');
@@ -394,6 +472,7 @@ export function exportBasketToCsv({
   const lines = [['Section', 'Item', 'Quantity', 'Price', 'Line Total']];
 
   const esc = (value) => '"' + String(value).replace(/"/g, '""') + '"';
+  const formatCurrencyWithSymbol = (value) => '$' + formatCurrency(value);
 
   for (let si = 0; si < report.sections.length; si++) {
     const sec = report.sections[si];
@@ -425,21 +504,51 @@ export function exportBasketToCsv({
         ]);
       }
     }
+    lines.push([
+      sec.name,
+      'Section Total (Ex GST)',
+      '',
+      '',
+      formatCurrencyWithSymbol(sec.rawTotalEx)
+    ]);
+    lines.push([
+      sec.name,
+      'Section Discount (%)',
+      '',
+      '',
+      formatPercent(sec.sectionDiscountPercent) + '%'
+    ]);
+    lines.push([
+      sec.name,
+      'Section Grand Total (Ex GST)',
+      '',
+      '',
+      formatCurrencyWithSymbol(sec.discountedEx)
+    ]);
     const notes = (sec.notes || '').trim();
     if (notes) {
       lines.push(['Section ' + (si + 1) + ' Notes', notes, '', '', '']);
     }
   }
 
-  const discountedEx = recalcGrandTotal(report.grandEx, discountPercent);
-  const gstAfter = calculateGst(discountedEx);
-  const grandIncl = roundCurrency(discountedEx + gstAfter);
+  const discountedEx = report && isFinite(report.discountedEx)
+    ? report.discountedEx
+    : recalcGrandTotal(report.grandEx, discountPercent);
+  const effectivePercent = report && isFinite(report.effectiveDiscountPercent)
+    ? report.effectiveDiscountPercent
+    : discountPercent;
+  const gstAfter = report && isFinite(report.grandGst)
+    ? report.grandGst
+    : calculateGst(discountedEx);
+  const grandIncl = report && isFinite(report.grandTotal)
+    ? report.grandTotal
+    : roundCurrency(discountedEx + gstAfter);
 
-  lines.push(['Total (Ex GST)', '', '', '', formatCurrency(report.grandEx)]);
-  lines.push(['Discount (%)', '', '', '', formatPercent(discountPercent)]);
-  lines.push(['Grand Total (Ex GST)', '', '', '', formatCurrency(discountedEx)]);
-  lines.push(['GST', '', '', '', formatCurrency(gstAfter)]);
-  lines.push(['Grand Total (Incl. GST)', '', '', '', formatCurrency(grandIncl)]);
+  lines.push(['Total (Ex GST)', '', '', '', formatCurrencyWithSymbol(report.grandEx)]);
+  lines.push(['Discount (%)', '', '', '', formatPercent(effectivePercent) + '%']);
+  lines.push(['Grand Total (Ex GST)', '', '', '', formatCurrencyWithSymbol(discountedEx)]);
+  lines.push(['GST', '', '', '', formatCurrencyWithSymbol(gstAfter)]);
+  lines.push(['Grand Total (Incl. GST)', '', '', '', formatCurrencyWithSymbol(grandIncl)]);
 
   const out = [];
   for (let r = 0; r < lines.length; r++) {

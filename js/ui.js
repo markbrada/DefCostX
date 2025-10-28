@@ -444,6 +444,231 @@ window.DefCost.ui = window.DefCost.ui || {};
       }
       return value;
     };
+    var roundCurrencyValue = function (value) {
+      var num = Number(value);
+      if (!isFinite(num)) {
+        return 0;
+      }
+      return Math.round(num * 100) / 100;
+    };
+    var formatPercentValue = function (value) {
+      return roundCurrencyValue(value).toFixed(2);
+    };
+    var formatCurrencyWithSymbol = function (value) {
+      return '$' + formatCurrency(value);
+    };
+
+    function appendSectionSummaryRows(reportData, sectionState) {
+      var summarySection = null;
+      if (reportData && Array.isArray(reportData.sections)) {
+        for (var si = 0; si < reportData.sections.length; si++) {
+          if (reportData.sections[si].id === activeSectionId) {
+            summarySection = reportData.sections[si];
+            break;
+          }
+        }
+      }
+
+      var rawTotal = summarySection && isFinite(summarySection.rawTotalEx) ? summarySection.rawTotalEx : 0;
+      var discountedEx = summarySection && isFinite(summarySection.discountedEx) ? summarySection.discountedEx : rawTotal;
+      var percentValue = sectionState && isFinite(sectionState.discountPercent)
+        ? roundCurrencyValue(sectionState.discountPercent)
+        : 0;
+      var overrideValue = sectionState && isFinite(sectionState.overrideTotalEx)
+        ? roundCurrencyValue(sectionState.overrideTotalEx)
+        : null;
+      var overrideActive = !!(summarySection && summarySection.hasOverride) || overrideValue !== null;
+
+      var fragment = document.createDocumentFragment();
+
+      function buildRow(labelText, builder, extraClass) {
+        var row = document.createElement('tr');
+        row.className = 'section-summary-row' + (extraClass ? ' ' + extraClass : '');
+        var labelCell = document.createElement('td');
+        labelCell.colSpan = 5;
+        labelCell.className = 'section-summary-label';
+        labelCell.textContent = labelText;
+        var valueCell = document.createElement('td');
+        valueCell.colSpan = 2;
+        valueCell.className = 'section-summary-value';
+        builder(valueCell, labelCell);
+        row.appendChild(labelCell);
+        row.appendChild(valueCell);
+        return row;
+      }
+
+      fragment.appendChild(
+        buildRow('Section Total (Ex GST)', function (valueCell) {
+          var amount = document.createElement('span');
+          amount.className = 'section-summary-amount';
+          amount.textContent = formatCurrencyWithSymbol(rawTotal);
+          valueCell.appendChild(amount);
+        }, 'section-summary-row--total')
+      );
+
+      fragment.appendChild(
+        buildRow('Section Discount (%)', function (valueCell) {
+          var wrapper = document.createElement('div');
+          wrapper.className = 'section-summary-input';
+          var input = document.createElement('input');
+          input.type = 'number';
+          input.step = '0.01';
+          input.min = '0';
+          input.max = '100';
+          input.inputMode = 'decimal';
+          input.value = formatPercentValue(percentValue);
+          input.setAttribute('aria-label', 'Section discount percent');
+          var suffix = document.createElement('span');
+          suffix.textContent = '%';
+          wrapper.appendChild(input);
+          wrapper.appendChild(suffix);
+          var message = document.createElement('div');
+          message.className = 'section-summary-message';
+          valueCell.appendChild(wrapper);
+          valueCell.appendChild(message);
+          input.addEventListener('change', function () {
+            var rawInput = parseFloat(input.value);
+            var warning = '';
+            if (!isFinite(rawInput)) {
+              rawInput = 0;
+              warning = 'Enter a valid percentage.';
+            }
+            if (rawInput < 0) {
+              rawInput = 0;
+              warning = 'Minimum is 0%.';
+            } else if (rawInput > 100) {
+              rawInput = 100;
+              warning = 'Maximum is 100%.';
+            }
+            var nextPercent = roundCurrencyValue(rawInput);
+            if (sectionState) {
+              var previous = isFinite(sectionState.discountPercent) ? roundCurrencyValue(sectionState.discountPercent) : 0;
+              if (Math.abs(previous - nextPercent) < 0.005) {
+                input.value = formatPercentValue(previous);
+                message.textContent = warning;
+                return;
+              }
+              sectionState.discountPercent = nextPercent;
+              currentGrandTotal = 0;
+              message.textContent = warning;
+              if (typeof showToast === 'function') {
+                if (warning) {
+                  showToast('Section discount applied (clamped to ' + formatPercentValue(nextPercent) + '%).');
+                } else {
+                  showToast('Section discount applied');
+                }
+              }
+              window.DefCost.ui.renderBasket();
+            } else {
+              input.value = formatPercentValue(nextPercent);
+              message.textContent = warning;
+            }
+          });
+        }, 'section-summary-row--percent')
+      );
+
+      fragment.appendChild(
+        buildRow('Section Grand Total (Ex GST)', function (valueCell, labelCell) {
+          if (overrideActive) {
+            var badge = document.createElement('span');
+            badge.className = 'section-summary-badge';
+            badge.textContent = 'Override active';
+            labelCell.appendChild(badge);
+          }
+          var wrapper = document.createElement('div');
+          wrapper.className = 'section-summary-input section-summary-input--currency';
+          var prefix = document.createElement('span');
+          prefix.textContent = '$';
+          wrapper.appendChild(prefix);
+          var input = document.createElement('input');
+          input.type = 'number';
+          input.step = '0.01';
+          input.min = '0';
+          input.inputMode = 'decimal';
+          if (rawTotal > 0) {
+            input.max = String(roundCurrencyValue(rawTotal));
+          }
+          if (overrideValue !== null) {
+            input.value = formatCurrency(overrideValue);
+          } else {
+            input.value = '';
+          }
+          input.placeholder = formatCurrency(discountedEx);
+          input.setAttribute('aria-label', 'Section grand total (ex GST)');
+          wrapper.appendChild(input);
+          var resetBtn = document.createElement('button');
+          resetBtn.type = 'button';
+          resetBtn.className = 'section-summary-reset';
+          resetBtn.setAttribute('aria-label', 'Reset section override');
+          resetBtn.textContent = '⟲';
+          if (!overrideActive) {
+            resetBtn.style.display = 'none';
+          }
+          wrapper.appendChild(resetBtn);
+          var message = document.createElement('div');
+          message.className = 'section-summary-message';
+          valueCell.appendChild(wrapper);
+          valueCell.appendChild(message);
+
+          var applyOverride = function (value, isReset) {
+            if (!sectionState) {
+              return;
+            }
+            sectionState.overrideTotalEx = value;
+            currentGrandTotal = 0;
+            if (typeof showToast === 'function') {
+              showToast(isReset ? 'Section discount reset' : 'Section discount applied');
+            }
+            window.DefCost.ui.renderBasket();
+          };
+
+          input.addEventListener('change', function () {
+            var rawInput = String(input.value || '').trim();
+            if (!rawInput) {
+              message.textContent = '';
+              applyOverride(null, true);
+              return;
+            }
+            var parsed = parseFloat(rawInput);
+            if (!isFinite(parsed)) {
+              message.textContent = 'Enter a valid amount.';
+              input.value = '';
+              return;
+            }
+            if (parsed < 0) {
+              parsed = 0;
+              message.textContent = 'Minimum is $0.00.';
+            } else if (parsed > rawTotal) {
+              parsed = rawTotal;
+              message.textContent = 'Cannot exceed section total.';
+            } else {
+              message.textContent = '';
+            }
+            var rounded = roundCurrencyValue(parsed);
+            if (sectionState) {
+              var previousOverride = isFinite(sectionState.overrideTotalEx) ? roundCurrencyValue(sectionState.overrideTotalEx) : null;
+              if (previousOverride !== null && Math.abs(previousOverride - rounded) < 0.005) {
+                input.value = formatCurrency(rounded);
+                return;
+              }
+              applyOverride(rounded, false);
+            } else {
+              input.value = formatCurrency(rounded);
+            }
+          });
+
+          resetBtn.addEventListener('click', function () {
+            if (sectionState && sectionState.overrideTotalEx == null) {
+              return;
+            }
+            message.textContent = '';
+            applyOverride(null, true);
+          });
+        }, 'section-summary-row--grand')
+      );
+
+      bBody.appendChild(fragment);
+    }
 
     function renderParent(b) {
       if (!sections.some(function (sec) { return sec.id === b.sectionId; })) {
@@ -732,6 +957,7 @@ window.DefCost.ui = window.DefCost.ui || {};
 
     var report = buildReportModel(basket, sections);
     var sectionRef = getSectionById(activeSectionId);
+    appendSectionSummaryRows(report, sectionRef);
     bFoot.innerHTML = '';
     var notesRow = document.createElement('tr');
     var notesCell = document.createElement('td');
