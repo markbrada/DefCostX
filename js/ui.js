@@ -426,6 +426,35 @@ window.DefCost.ui = window.DefCost.ui || {};
           }
           return num.toFixed(2);
         };
+    var formatPercent = typeof api.formatPercent === 'function'
+      ? api.formatPercent
+      : function (value) {
+          var num = Number(value);
+          if (!isFinite(num)) {
+            return '0.00';
+          }
+          return num.toFixed(2);
+        };
+    var recalcGrandTotalFn = typeof api.recalcGrandTotal === 'function'
+      ? api.recalcGrandTotal
+      : function (base, discount) {
+          var b = Number(base);
+          var d = Number(discount);
+          if (!isFinite(b)) {
+            b = 0;
+          }
+          if (!isFinite(d)) {
+            d = 0;
+          }
+          var computed = b * (1 - d / 100);
+          if (!isFinite(computed)) {
+            computed = 0;
+          }
+          return Math.round(computed * 100) / 100;
+        };
+    var discountPercentValue = typeof state.getDiscountPercent === 'function'
+      ? state.getDiscountPercent()
+      : (Number.isFinite(state.discountPercent) ? state.discountPercent : 0);
     var getDisplayQty = function (value) {
       if (Number.isFinite(value)) {
         return value > 0 ? value : 0;
@@ -733,6 +762,113 @@ window.DefCost.ui = window.DefCost.ui || {};
     var report = buildReportModel(basket, sections);
     var sectionRef = getSectionById(activeSectionId);
     bFoot.innerHTML = '';
+    var reportSections = report && Array.isArray(report.sections) ? report.sections : [];
+    var sectionTotals = null;
+    for (var rs = 0; rs < reportSections.length; rs++) {
+      if (reportSections[rs] && reportSections[rs].id === activeSectionId) {
+        sectionTotals = reportSections[rs];
+        break;
+      }
+    }
+    if (!sectionTotals && reportSections.length) {
+      sectionTotals = reportSections[0];
+    }
+    var sectionTotalValue = sectionTotals && isFinite(sectionTotals.subtotalEx) ? sectionTotals.subtotalEx : 0;
+    var sectionDiscountEnabled = sectionRef && sectionRef.discountEnabled === false ? false : true;
+    var sectionDiscountPercent = sectionDiscountEnabled ? discountPercentValue : 0;
+    var sectionGrandTotalValue = recalcGrandTotalFn(sectionTotalValue, sectionDiscountPercent);
+    var summaryRow = document.createElement('tr');
+    var summaryCell = document.createElement('td');
+    summaryCell.colSpan = 7;
+    summaryCell.className = 'section-summary-cell';
+    var summaryWrapper = document.createElement('div');
+    summaryWrapper.className = 'grand-totals-wrapper section-totals-wrapper';
+    var summaryTable = document.createElement('table');
+    summaryTable.className = 'grand-totals-table';
+    var summaryBody = document.createElement('tbody');
+
+    var totalRow = document.createElement('tr');
+    var totalLabel = document.createElement('th');
+    totalLabel.scope = 'row';
+    totalLabel.textContent = 'Total';
+    var totalValueCell = document.createElement('td');
+    totalValueCell.className = 'totals-value';
+    totalValueCell.textContent = formatCurrency(sectionTotalValue);
+    totalRow.appendChild(totalLabel);
+    totalRow.appendChild(totalValueCell);
+    summaryBody.appendChild(totalRow);
+
+    var discountRow = document.createElement('tr');
+    var discountLabel = document.createElement('th');
+    discountLabel.scope = 'row';
+    discountLabel.textContent = 'Discount (%)';
+    var discountValueCell = document.createElement('td');
+    var discountContainer = document.createElement('div');
+    discountContainer.className = 'grand-totals-input section-discount-control';
+    var discountInput = document.createElement('input');
+    discountInput.type = 'text';
+    discountInput.readOnly = true;
+    discountInput.setAttribute('aria-readonly', 'true');
+    discountInput.setAttribute('aria-label', 'Section discount percentage');
+    discountInput.value = formatPercent(sectionDiscountPercent);
+    discountInput.tabIndex = -1;
+    discountInput.dataset.role = 'section-discount-display';
+    var percentSpan = document.createElement('span');
+    percentSpan.className = 'section-percent';
+    percentSpan.textContent = '%';
+    var toggleLabel = document.createElement('label');
+    toggleLabel.className = 'section-discount-toggle';
+    toggleLabel.title = 'Apply discount to this section';
+    var toggleInput = document.createElement('input');
+    toggleInput.type = 'checkbox';
+    toggleInput.checked = sectionDiscountEnabled;
+    toggleInput.setAttribute('aria-label', 'Apply discount to this section');
+    toggleInput.onchange = function () {
+      if (sectionRef) {
+        sectionRef.discountEnabled = toggleInput.checked;
+      }
+      persistBasket();
+      renderBasket();
+    };
+    var toggleText = document.createElement('span');
+    toggleText.textContent = 'Apply';
+    toggleLabel.appendChild(toggleInput);
+    toggleLabel.appendChild(toggleText);
+    discountContainer.appendChild(discountInput);
+    discountContainer.appendChild(percentSpan);
+    discountContainer.appendChild(toggleLabel);
+    discountValueCell.appendChild(discountContainer);
+    discountRow.appendChild(discountLabel);
+    discountRow.appendChild(discountValueCell);
+    summaryBody.appendChild(discountRow);
+
+    var grandRow = document.createElement('tr');
+    var grandLabel = document.createElement('th');
+    grandLabel.scope = 'row';
+    grandLabel.textContent = 'Grand Total';
+    var grandValueCell = document.createElement('td');
+    var grandContainer = document.createElement('div');
+    grandContainer.className = 'grand-totals-input section-grand-total-display';
+    var grandInput = document.createElement('input');
+    grandInput.type = 'text';
+    grandInput.readOnly = true;
+    grandInput.setAttribute('aria-readonly', 'true');
+    grandInput.setAttribute('aria-label', 'Section grand total');
+    grandInput.value = formatCurrency(sectionGrandTotalValue);
+    grandInput.tabIndex = -1;
+    grandInput.dataset.role = 'section-grand-total-display';
+    grandContainer.appendChild(grandInput);
+    grandValueCell.appendChild(grandContainer);
+    grandRow.appendChild(grandLabel);
+    grandRow.appendChild(grandValueCell);
+    summaryBody.appendChild(grandRow);
+
+    summaryTable.appendChild(summaryBody);
+    summaryWrapper.appendChild(summaryTable);
+    summaryCell.appendChild(summaryWrapper);
+    summaryRow.appendChild(summaryCell);
+    bFoot.appendChild(summaryRow);
+
     var notesRow = document.createElement('tr');
     var notesCell = document.createElement('td');
     notesCell.colSpan = 7;

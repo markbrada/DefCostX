@@ -429,6 +429,12 @@ export function exportBasketToCsv({
     if (notes) {
       lines.push(['Section ' + (si + 1) + ' Notes', notes, '', '', '']);
     }
+    const sectionDiscountEnabled = sec && sec.discountEnabled === false ? false : true;
+    const sectionDiscountPercent = sectionDiscountEnabled ? discountPercent : 0;
+    const sectionGrandTotal = recalcGrandTotal(sec.subtotalEx, sectionDiscountPercent);
+    lines.push([sec.name + ' Total', '', '', '', formatCurrency(sec.subtotalEx)]);
+    lines.push([sec.name + ' Discount (%)', '', '', '', formatPercent(sectionDiscountPercent)]);
+    lines.push([sec.name + ' Grand Total', '', '', '', formatCurrency(sectionGrandTotal)]);
   }
 
   const discountedEx = recalcGrandTotal(report.grandEx, discountPercent);
